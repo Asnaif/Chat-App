@@ -67,8 +67,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           { timeout: 3000 }
         );
 
-        if (response.data && response.data.token) {
-          const { token: receivedToken, user: receivedUser } = response.data;
+        const resData = response.data?.data || response.data;
+        if (resData && resData.token) {
+          const receivedToken = resData.token;
+          const rawUser = resData.user;
+          const receivedUser: User = {
+            _id: rawUser.id || rawUser._id,
+            fullName: rawUser.name || rawUser.fullName,
+            email: rawUser.email,
+            profilePhoto: rawUser.avatarUrl || rawUser.profilePhoto,
+            bio: rawUser.about || rawUser.bio,
+            isOnline: rawUser.status === 'online',
+          };
           setToken(receivedToken);
           setUser(receivedUser);
           localStorage.setItem("cm_chat_token", receivedToken);
@@ -133,12 +143,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       try {
         const response = await axios.post(
           `${API_URL}/api/auth/register`,
-          { fullName, email, password, profilePhoto },
+          { name: fullName, fullName, email, password, profilePhoto },
           { timeout: 3000 }
         );
 
-        if (response.data && response.data.token) {
-          const { token: receivedToken, user: receivedUser } = response.data;
+        const resData = response.data?.data || response.data;
+        if (resData && resData.token) {
+          const receivedToken = resData.token;
+          const rawUser = resData.user;
+          const receivedUser: User = {
+            _id: rawUser.id || rawUser._id,
+            fullName: rawUser.name || rawUser.fullName,
+            email: rawUser.email,
+            profilePhoto: rawUser.avatarUrl || rawUser.profilePhoto,
+            bio: rawUser.about || rawUser.bio,
+            isOnline: rawUser.status === 'online',
+          };
           setToken(receivedToken);
           setUser(receivedUser);
           localStorage.setItem("cm_chat_token", receivedToken);
