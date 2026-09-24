@@ -4,6 +4,7 @@ import { Chat } from '../models/Chat';
 import { Message } from '../models/Message';
 import { sendSuccess } from '../utils/apiResponse';
 import { ApiError } from '../utils/apiError';
+import { getIO } from '../sockets';
 
 export const getChats = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
@@ -142,10 +143,142 @@ export const createMessage = async (req: Request, res: Response, next: NextFunct
 
     const populatedMessage = await Message.findById(newMessage._id).populate('senderId', 'name avatarUrl');
 
+    // Broadcast realtime event to Socket.io room and user rooms
+    try {
+      const io = getIO();
+      io.to(`chat:${chatId}`).emit('message:created', populatedMessage);
+
+      chat.participantIds.forEach((pid) => {
+        if (pid.toString() !== currentUserId) {
+          io.to(`user:${pid.toString()}`).emit('chat:updated', {
+            chatId,
+            lastMessage: populatedMessage,
+          });
+        }
+      });
+    } catch (_) {}
+
     sendSuccess({
       res,
       statusCode: 201,
       data: populatedMessage,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const editMessage = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const messageId = req.params.messageId as string;
+    const currentUserId = req.user?.userId;
+    const { text } = req.body;
+
+    if (!text || text.trim() === '') {
+      throw new ApiError(400, 'Text is required to edit message', 'VALIDATION_ERROR');
+    }
+
+    const message = await Message.findById(messageId);
+    if (!message) {
+      throw new ApiError(404, 'Message not found', 'MESSAGE_NOT_FOUND');
+    }
+
+    if (message.senderId.toString() !== currentUserId) {
+      throw new ApiError(403, 'You can only edit your own messages', 'AUTH_FORBIDDEN');
+    }
+
+    if (message.deletedAt) {
+      throw new ApiError(400, 'Cannot edit a deleted message', 'INVALID_OPERATION');
+    }
+
+    message.text = text.trim();
+    await message.save();
+
+    const populated = await Message.findById(message._id).populate('senderId', 'name avatarUrl');
+
+    try {
+      const io = getIO();
+      io.to(`chat:${message.chatId}`).emit('message:updated', populated);
+    } catch (_) {}
+
+    sendSuccess({
+      res,
+      message: 'Message updated successfully',
+      data: populated,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const deleteMessage = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const messageId = req.params.messageId as string;
+    const currentUserId = req.user?.userId;
+
+    const message = await Message.findById(messageId);
+    if (!message) {
+      throw new ApiError(404, 'Message not found', 'MESSAGE_NOT_FOUND');
+    }
+
+    if (message.senderId.toString() !== currentUserId) {
+      throw new ApiError(403, 'You can only delete your own messages', 'AUTH_FORBIDDEN');
+    }
+
+    message.deletedAt = new Date();
+    message.text = 'This message was deleted';
+    await message.save();
+
+    try {
+      const io = getIO();
+      io.to(`chat:${message.chatId}`).emit('message:deleted', {
+        messageId: message._id,
+        chatId: message.chatId,
+      });
+    } catch (_) {}
+
+    sendSuccess({
+      res,
+      message: 'Message deleted successfully',
+      data: null,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const markChatAsRead = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const chatId = req.params.chatId as string;
+    const currentUserId = req.user?.userId;
+
+    const chat = await Chat.findById(chatId);
+    if (!chat) {
+      throw new ApiError(404, 'Chat not found', 'CHAT_NOT_FOUND');
+    }
+
+    const isMember = chat.participantIds.some((id) => id.toString() === currentUserId);
+    if (!isMember) {
+      throw new ApiError(403, 'Unauthorized', 'AUTH_FORBIDDEN');
+    }
+
+    await Message.updateMany(
+      { chatId, readBy: { $ne: currentUserId } },
+      { $addToSet: { readBy: currentUserId } }
+    );
+
+    try {
+      const io = getIO();
+      io.to(`chat:${chatId}`).emit('message:read', {
+        chatId,
+        userId: currentUserId,
+      });
+    } catch (_) {}
+
+    sendSuccess({
+      res,
+      message: 'Messages marked as read',
+      data: null,
     });
   } catch (error) {
     next(error);
