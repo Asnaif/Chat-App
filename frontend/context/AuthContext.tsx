@@ -63,8 +63,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       try {
         const response = await axios.post(
           `${API_URL}/api/auth/login`,
-          { email, password },
-          { timeout: 3000 }
+          { email: email.toLowerCase().trim(), password },
+          { timeout: 10000 }
         );
 
         const resData = response.data?.data || response.data;
@@ -83,46 +83,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           setUser(receivedUser);
           localStorage.setItem("cm_chat_token", receivedToken);
           localStorage.setItem("cm_chat_user", JSON.stringify(receivedUser));
-          toast.success("Welcome back! Login successful.");
-          return true;
-        }
-      } catch (networkError: any) {
-        // If backend server is offline or unreachable, provide seamless client simulation
-        if (
-          !networkError.response ||
-          networkError.code === "ECONNABORTED" ||
-          networkError.code === "ERR_NETWORK"
-        ) {
-          console.warn("Backend API offline. Using client simulation for testing.");
-          
-          // Simulated mock login
-          const mockUser: User = {
-            _id: "usr_" + Math.random().toString(36).substring(2, 9),
-            fullName: email.split("@")[0].replace(/[._]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) || "Alex Johnson",
-            email: email,
-            profilePhoto: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80",
-            bio: "Hey there! I'm using CM Chat.",
-            isOnline: true,
-          };
-          const mockToken = "mock_jwt_token_" + Date.now();
-
-          setToken(mockToken);
-          setUser(mockUser);
-          localStorage.setItem("cm_chat_token", mockToken);
-          localStorage.setItem("cm_chat_user", JSON.stringify(mockUser));
           toast.success("Welcome back! Logged in successfully.");
           return true;
-        } else {
-          // Real backend returned 400 / 401
-          const msg =
-            networkError.response?.data?.message ||
-            networkError.response?.data?.error?.message ||
-            "Invalid email or password.";
-          toast.error(msg);
-          return false;
         }
+        return false;
+      } catch (networkError: any) {
+        const msg =
+          networkError.response?.data?.message ||
+          networkError.response?.data?.error?.message ||
+          (networkError.code === "ERR_NETWORK"
+            ? "Cannot connect to Backend (port 5000). Please ensure server is running."
+            : "Invalid email or password.");
+        toast.error(msg);
+        return false;
       }
-      return false;
     } catch (err: any) {
       toast.error(err.message || "An unexpected error occurred during login.");
       return false;
@@ -139,12 +113,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   ): Promise<boolean> => {
     setIsLoading(true);
     try {
-      // Attempt real backend call first
       try {
         const response = await axios.post(
           `${API_URL}/api/auth/register`,
-          { name: fullName, fullName, email, password, profilePhoto },
-          { timeout: 3000 }
+          { name: fullName.trim(), email: email.toLowerCase().trim(), password, profilePhoto },
+          { timeout: 10000 }
         );
 
         const resData = response.data?.data || response.data;
@@ -163,46 +136,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           setUser(receivedUser);
           localStorage.setItem("cm_chat_token", receivedToken);
           localStorage.setItem("cm_chat_user", JSON.stringify(receivedUser));
-          toast.success("Account created successfully!");
+          toast.success("Account created successfully in MongoDB!");
           return true;
         }
+        return false;
       } catch (networkError: any) {
-        // If backend server is offline or unreachable, provide seamless client simulation
-        if (
-          !networkError.response ||
-          networkError.code === "ECONNABORTED" ||
-          networkError.code === "ERR_NETWORK"
-        ) {
-          console.warn("Backend API offline. Using client simulation for testing.");
-
-          const mockUser: User = {
-            _id: "usr_" + Math.random().toString(36).substring(2, 9),
-            fullName,
-            email,
-            profilePhoto:
-              profilePhoto ||
-              "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=250&q=80",
-            bio: "Hey there! I'm using CM Chat.",
-            isOnline: true,
-          };
-          const mockToken = "mock_jwt_token_" + Date.now();
-
-          setToken(mockToken);
-          setUser(mockUser);
-          localStorage.setItem("cm_chat_token", mockToken);
-          localStorage.setItem("cm_chat_user", JSON.stringify(mockUser));
-          toast.success("Account created successfully!");
-          return true;
-        } else {
-          const msg =
-            networkError.response?.data?.message ||
-            networkError.response?.data?.error?.message ||
-            "Failed to register. Please check your details.";
-          toast.error(msg);
-          return false;
-        }
+        const msg =
+          networkError.response?.data?.message ||
+          networkError.response?.data?.error?.message ||
+          (networkError.code === "ERR_NETWORK"
+            ? "Cannot connect to Backend (port 5000). Please ensure server is running."
+            : "Failed to register. Please check your details.");
+        toast.error(msg);
+        return false;
       }
-      return false;
     } catch (err: any) {
       toast.error(err.message || "An unexpected error occurred during registration.");
       return false;

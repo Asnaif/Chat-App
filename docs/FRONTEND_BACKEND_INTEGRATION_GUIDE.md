@@ -1,137 +1,154 @@
-# 📘 Complete Frontend-Backend Integration Guide
-**CM Chat Application — Full-Stack Architecture & Step-by-Step Integration**
+# 📚 CM Chat App — Complete End-to-End Integration Guide
+**Frontend (Next.js) + Backend (Express & TypeScript) + Database (MongoDB)**
 
 ---
 
 ## 📑 Table of Contents
-1. [Architecture Overview](#1-architecture-overview)
-2. [Environment Configuration (.env)](#2-environment-configuration-env)
-3. [Starting MongoDB & Servers](#3-starting-mongodb--servers)
-4. [REST API Integration (Axios Layer)](#4-rest-api-integration-axios-layer)
-5. [Authentication Flow Integration](#5-authentication-flow-integration)
-6. [Real-Time WebSocket Integration (Socket.IO)](#6-real-time-websocket-integration-socketio)
-7. [Chats & Messages Integration Walkthrough](#7-chats--messages-integration-walkthrough)
-8. [WebRTC Calling Signaling (Day 4)](#8-webrtc-calling-signaling-day-4)
-9. [Common Errors & Troubleshooting](#9-common-errors--troubleshooting)
+1. [Full-Stack Architecture Overview](#1-full-stack-architecture-overview)
+2. [Step 1: MongoDB Database Connection (Tafseel Se)](#2-step-1-mongodb-database-connection-tafseel-se)
+3. [Step 2: Backend Server Setup & CORS (Port 5000)](#3-step-2-backend-server-setup--cors-port-5000)
+4. [Step 3: Frontend to Backend REST API Integration](#4-step-3-frontend-to-backend-rest-api-integration)
+5. [Step 4: Authentication Flow & MongoDB Storage Walkthrough](#5-step-4-authentication-flow--mongodb-storage-walkthrough)
+6. [Step 5: Real-Time Socket.IO Integration](#6-step-5-real-time-socketio-integration)
+7. [Step 6: MongoDB Compass Mein Data Dekhne Ka Tareeqa](#7-step-6-mongodb-compass-mein-data-dekhne-ka-tareeqa)
+8. [Troubleshooting & Common Errors (With Solutions)](#8-troubleshooting--common-errors-with-solutions)
 
 ---
 
-## 1. Architecture Overview
+## 1. Full-Stack Architecture Overview
 
-CM Chat App consists of two standalone applications communicating via **REST APIs** and **WebSockets (Socket.IO)**:
+Hamara project teen alag layers par mushtamil hai jo aapas mein synchronized hain:
 
 ```
-┌─────────────────────────────────┐           ┌──────────────────────────────────┐
-│       FRONTEND (Next.js 14)     │           │      BACKEND (Express + TS)      │
-│     http://localhost:3001       │           │      http://localhost:5000       │
-├─────────────────────────────────┤           ├──────────────────────────────────┤
-│ • AuthContext (JWT & User state)│  HTTP/REST│ • Express REST APIs              │
-│ • Axios Client (API Requests)   │ ────────> │ • JWT Authentication Middleware  │
-│ • Socket.IO Client (Real-time)  │ <───────> │ • Socket.IO Server Engine        │
-│ • WebRTC PeerConnection (Calls) │  WebSocket│ • Mongoose Models (MongoDB)      │
-└─────────────────────────────────┘           └──────────────────────────────────┘
-                                                               │
-                                                               ▼
-                                                      ┌──────────────────┐
-                                                      │  MongoDB Database│
-                                                      │   port: 27017    │
-                                                      └──────────────────┘
+┌────────────────────────────────────────┐
+│         FRONTEND (Next.js 14)          │  Port: 3001 (ya 3000)
+│   • AuthContext (State & Session)      │  Dir: /frontend
+│   • Axios Client (lib/api.ts)          │
+│   • Socket.IO Client (lib/socket.ts)   │
+└───────────────────┬────────────────────┘
+                    │
+                    │ HTTP REST Requests (Axios) + WebSockets
+                    ▼
+┌────────────────────────────────────────┐
+│     BACKEND API (Express + TypeScript) │  Port: 5000
+│   • JWT Auth Middleware                │  Dir: /backend
+│   • Socket.IO Server Engine            │
+│   • Controllers & Routes               │
+└───────────────────┬────────────────────┘
+                    │
+                    │ Mongoose ODM Driver
+                    ▼
+┌────────────────────────────────────────┐
+│          DATABASE (MongoDB)            │  Port: 27017
+│   • Database Name: "chat_app"          │  Service: Local / Atlas
+│   • Collections: users, chats,         │
+│     messages, groups, settings, calls  │
+└────────────────────────────────────────┘
 ```
 
 ---
 
-## 2. Environment Configuration (.env)
+## 2. Step 1: MongoDB Database Connection (Tafseel Se)
 
-Dono ends ko aapas mein connect karne ke liye environment variables setup karna zaroori hai:
+MongoDB hamari application ka persistent data storage hai jahan users, unke passwords (hashed), chats, aur messages mehfooz hote hain.
 
-### ⚙️ Backend: `backend/.env`
-File location: [`backend/.env`](file:///c:/Users/Lenovo/Documents/psw/Chat-App/backend/.env)
+### 2.1 Configuration File: `backend/.env`
+Database connection string [`backend/.env`](file:///c:/Users/Lenovo/Documents/psw/Chat-App/backend/.env) mein define hoti hai:
 ```env
-PORT=5000
-NODE_ENV=development
-
-# Frontend ka exact URL jo CORS ke zariye allowed hoga:
-CLIENT_URL=http://localhost:3001
-
-# MongoDB Connection String:
+# Local MongoDB connection URI (Database name: chat_app)
 MONGODB_URI=mongodb://localhost:27017/chat_app
-
-# JWT Configuration:
-JWT_SECRET=super_secret_jwt_key_chat_app_development_12345
-JWT_EXPIRES_IN=7d
-
-# Cloudinary (Media storage jab configure karna ho):
-CLOUDINARY_CLOUD_NAME=
-CLOUDINARY_API_KEY=
-CLOUDINARY_API_SECRET=
 ```
 
-### ⚙️ Frontend: `frontend/.env.local`
-File location: [`frontend/.env.local`](file:///c:/Users/Lenovo/Documents/psw/Chat-App/frontend/.env.local)
-```env
-# Backend REST API Base URL
-NEXT_PUBLIC_API_URL=http://localhost:5000
+### 2.2 Connection Implementation Code: `backend/src/config/db.ts`
+Backend Mongoose ke zariye MongoDB se connect hota hai:
+```typescript
+import mongoose from 'mongoose';
+import { ENV } from './env';
 
-# Backend Socket.IO Server URL
+export const connectDB = async (): Promise<void> => {
+  try {
+    const conn = await mongoose.connect(ENV.MONGODB_URI);
+    console.log(`[MongoDB Connected]: ${conn.connection.host}`);
+  } catch (error) {
+    console.error('[MongoDB Connection Error]:', error);
+    process.exit(1);
+  }
+};
+```
+
+### 2.3 Server Startup Mein Connection Call: `backend/src/server.ts`
+Server listen karne se pehle database connection ensure karta hai:
+```typescript
+const startServer = async (): Promise<void> => {
+  // 1. Pehle MongoDB connect karo
+  await connectDB();
+
+  // 2. Phir HTTP server aur Socket.IO listen karo
+  httpServer.listen(5000, () => {
+    console.log('🚀 Server running on Port 5000');
+  });
+};
+```
+
+---
+
+## 3. Step 2: Backend Server Setup & CORS (Port 5000)
+
+Backend Express API ko frontend se connect karne ke liye sab se ahem cheez **CORS (Cross-Origin Resource Sharing)** hoti hai.
+
+### 3.1 CORS Configuration: `backend/src/app.ts`
+Frontend chahe port `3000` par chal raha ho ya `3001` par, backend dono ko allow karta hai:
+```typescript
+app.use(
+  cors({
+    origin: [ENV.CLIENT_URL, 'http://localhost:3000', 'http://localhost:3001'],
+    credentials: true,
+  })
+);
+```
+
+### 3.2 Backend Run Karne Ka Tareeqa:
+```bash
+cd backend
+npm run dev
+```
+**Terminal Output:**
+```text
+◇ injected env (12) from .env
+[MongoDB Connected]: localhost
+===============================================
+🚀 Chat App Backend Server Running on Port 5000
+🌍 Health Check: http://localhost:5000/health
+🔌 Socket.IO Server active on port 5000
+⚙️ Environment: development
+===============================================
+```
+
+---
+
+## 4. Step 3: Frontend to Backend REST API Integration
+
+Frontend ko backend se baat karne ke liye do cheezon ki zaroorat hoti hai:
+
+### 4.1 Environment Variables: `frontend/.env.local`
+[`frontend/.env.local`](file:///c:/Users/Lenovo/Documents/psw/Chat-App/frontend/.env.local) file mein backend ka address specify kiya gaya hai:
+```env
+NEXT_PUBLIC_API_URL=http://localhost:5000
 NEXT_PUBLIC_SOCKET_URL=http://localhost:5000
 ```
 
----
-
-## 3. Starting MongoDB & Servers
-
-### Step 3.1: Start MongoDB
-MongoDB local service start karein ya MongoDB Compass/Atlas use karein:
-```bash
-# Windows service check:
-net start MongoDB
-```
-
-### Step 3.2: Seed Sample Data (Optional)
-Aapke dost ne mock users aur chats ka seed script banaya hua hai:
-```bash
-cd backend
-npm run seed
-```
-
-### Step 3.3: Start Backend Server
-```bash
-cd backend
-npm run dev
-```
-* Backend port **`5000`** par chalega.
-* Verify karein: Browser mein `http://localhost:5000/health` open karein, yeh response aana chahiye:
-  ```json
-  { "success": true, "message": "Chat App API Server is healthy", "data": { "status": "UP" } }
-  ```
-
-### Step 3.4: Start Frontend Server
-Alag terminal window mein:
-```bash
-cd frontend
-npm run dev
-```
-* Frontend port **`3001`** (ya `3000`) par chalega.
-
----
-
-## 4. REST API Integration (Axios Layer)
-
-Frontend par tamam API requests ke liye ek standard Axios client use hota hai:
-
-### Axios Client Implementation (`frontend/lib/api.ts`):
+### 4.2 Centralized Axios Client: `frontend/lib/api.ts`
+Bar bar header mein token likhne ke bajaye humne automatic interceptor set kiya hai:
 ```typescript
 import axios from 'axios';
 
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000',
   timeout: 10000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  headers: { 'Content-Type': 'application/json' },
 });
 
-// Request Interceptor: Attach JWT Token automatically
+// Har request ke sath JWT token auto-attach hota hai
 api.interceptors.request.use((config) => {
   if (typeof window !== 'undefined') {
     const token = localStorage.getItem('cm_chat_token');
@@ -142,256 +159,151 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Response Interceptor: Handle 401 Unauthorized
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('cm_chat_token');
-        localStorage.removeItem('cm_chat_user');
-        window.location.href = '/login';
-      }
-    }
-    return Promise.reject(error);
-  }
-);
-
 export default api;
 ```
 
 ---
 
-## 5. Authentication Flow Integration
+## 5. Step 4: Authentication Flow & MongoDB Storage Walkthrough
 
-### 1. User Registration:
-* **Endpoint:** `POST /api/auth/register`
-* **Request Payload:**
-  ```json
-  {
-    "name": "Kashif Ahmed",
-    "email": "kashif@example.com",
-    "password": "password123"
-  }
-  ```
-* **Success Response (201):**
-  ```json
-  {
-    "success": true,
-    "message": "Registration successful",
-    "data": {
-      "user": {
-        "id": "673...",
-        "name": "Kashif Ahmed",
-        "email": "kashif@example.com",
-        "avatarUrl": null,
-        "status": "offline"
-      },
-      "token": "eyJhbGciOiJIUzI1NiIsIn..."
-    }
-  }
-  ```
-* **Frontend Action:**
-  1. Token ko `localStorage.setItem('cm_chat_token', data.token)` mein save karein.
-  2. User object ko `localStorage.setItem('cm_chat_user', JSON.stringify(data.user))` mein save karein.
-  3. Redux ya `AuthContext` state update karke user ko `/chat` route par navigate karein.
+Yeh woh process hai jiske zariye user ka data browser se nikal kar seedha MongoDB database mein jata hai:
 
-### 2. User Login:
-* **Endpoint:** `POST /api/auth/login`
-* **Request Payload:**
-  ```json
-  {
-    "email": "kashif@example.com",
-    "password": "password123"
-  }
-  ```
-* **Success Response (200):**
-  Same user data + JWT token return hota hai.
+```
+[Browser: /register] 
+       │  (User enters Name, Email, Password)
+       ▼
+[Frontend: AuthContext.tsx]
+       │  axios.post('http://localhost:5000/api/auth/register', payload)
+       ▼
+[Backend: auth.controller.ts]
+       │  1. Check duplicate email: User.findOne({ email })
+       │  2. Password hash: bcrypt.hash(password, 10)
+       │  3. Create record: User.create({ name, email, passwordHash })
+       ▼
+[MongoDB: chat_app Database]
+       │  "users" collection mein document insert ho gaya!
+       ▼
+[Backend Response]
+       │  Returns { success: true, data: { user, token } }
+       ▼
+[Frontend: AuthContext.tsx]
+       │  1. localStorage.setItem('cm_chat_token', token)
+       │  2. Toast: "Account created successfully in MongoDB!"
+       ▼
+[Browser: /chat] (Redirects to authenticated dashboard)
+```
 
-### 3. Current User Verification:
-* **Endpoint:** `GET /api/auth/me`
-* **Header:** `Authorization: Bearer <token>`
-* Page refresh par session rehydrate karne ke liye use hota hai.
-
----
-
-## 6. Real-Time WebSocket Integration (Socket.IO)
-
-Socket connection setup karte waqt backend ka JWT auth middleware token verify karta hai.
-
-### Socket Client Setup (`frontend/lib/socket.ts`):
+### 5.1 Registration Code in `frontend/context/AuthContext.tsx`:
 ```typescript
-import { io, Socket } from 'socket.io-client';
+const register = async (fullName: string, email: string, password: string) => {
+  const response = await axios.post(`${API_URL}/api/auth/register`, {
+    name: fullName.trim(),
+    email: email.toLowerCase().trim(),
+    password: password,
+  });
 
-let socket: Socket | null = null;
-
-export const getSocket = (): Socket => {
-  if (!socket) {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('cm_chat_token') : null;
-
-    socket = io(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:5000', {
-      auth: {
-        token: token,
-      },
-      transports: ['websocket'],
-      autoConnect: true,
-    });
-
-    socket.on('connect', () => {
-      console.log('✅ Connected to WebSocket server with ID:', socket?.id);
-    });
-
-    socket.on('connect_error', (err) => {
-      console.error('❌ Socket connection error:', err.message);
-    });
+  const resData = response.data?.data || response.data;
+  if (resData && resData.token) {
+    setToken(resData.token);
+    setUser(resData.user);
+    localStorage.setItem("cm_chat_token", resData.token);
+    localStorage.setItem("cm_chat_user", JSON.stringify(resData.user));
+    toast.success("Account created successfully in MongoDB!");
+    return true;
   }
-
-  return socket;
 };
 ```
 
-### Key Socket Events Mapping:
-
-| Direction | Event Name | Payload Format | Description |
-|-----------|------------|----------------|-------------|
-| **Client ➔ Server** | `chat:join` | `{ chatId: string }` | Chat room join karna |
-| **Client ➔ Server** | `chat:leave` | `{ chatId: string }` | Chat room se exit |
-| **Client ➔ Server** | `message:send` | `{ chatId, text, tempId, type }` | Naya message send karna |
-| **Server ➔ Client** | `message:created` | `{ _id, chatId, senderId, text, createdAt }` | Receiver ko live message deliver hona |
-| **Client ➔ Server** | `typing:start` | `{ chatId: string }` | Jab user type kar raha ho |
-| **Client ➔ Server** | `typing:stop` | `{ chatId: string }` | Jab user type karna band kare |
-| **Server ➔ Client** | `presence:update` | `{ userId, status, lastSeenAt }` | Online/Offline status live update |
-
 ---
 
-## 7. Chats & Messages Integration Walkthrough
+## 6. Step 5: Real-Time Socket.IO Integration
 
-Jab user chat screen open karta hai:
+Live messaging ke liye Socket.IO use hota hai:
 
-### Step 1: Conversations List Load Karna
+### 6.1 Socket Server: `backend/src/sockets/index.ts`
+Backend socket connection aane par user ka token verify karta hai aur uske personal room `user:<userId>` mein enter kar deta hai:
 ```typescript
-// Fetch user's chats
-const response = await api.get('/api/chats');
-const chats = response.data.data; // List of conversations with lastMessage & participants
+io.use((socket, next) => {
+  const token = socket.handshake.auth?.token;
+  if (!token) return next(new Error('Token missing'));
+  const decoded = verifyToken(token);
+  socket.data.user = decoded;
+  next();
+});
+
+io.on('connection', (socket) => {
+  const userId = socket.data.user?.userId;
+  socket.join(`user:${userId}`); // Direct messages / calls ke liye
+});
 ```
 
-### Step 2: Specific Chat Open Karna & Messages Load Karna
+### 6.2 Socket Client: `frontend/lib/socket.ts`
 ```typescript
-const openChat = async (chatId: string) => {
-  // 1. HTTP se previous messages fetch karein
-  const response = await api.get(`/api/messages/${chatId}?limit=50`);
-  setMessages(response.data.data);
+import { io } from 'socket.io-client';
 
-  // 2. Socket room join karein
-  const socket = getSocket();
-  socket.emit('chat:join', { chatId });
-};
-```
-
-### Step 3: Naya Message Send Karna (Optimistic UI)
-```typescript
-const sendMessage = (chatId: string, text: string) => {
-  const tempId = 'temp_' + Date.now();
-  
-  // 1. Local state mein foran message add karein (Optimistic UI)
-  setMessages((prev) => [
-    ...prev,
-    { _id: tempId, chatId, text, senderId: currentUser.id, status: 'sending' }
-  ]);
-
-  // 2. Socket par emit karein
-  const socket = getSocket();
-  socket.emit('message:send', {
-    chatId,
-    text,
-    tempId,
-    type: 'text',
+export const getSocket = () => {
+  const token = localStorage.getItem('cm_chat_token');
+  return io('http://localhost:5000', {
+    auth: { token },
+    transports: ['websocket'],
   });
 };
 ```
 
-### Step 4: Incoming Message Listen Karna
-```typescript
-useEffect(() => {
-  const socket = getSocket();
+---
 
-  socket.on('message:created', (newMsg) => {
-    // Agar usi chat ka message hai to state update karein
-    if (newMsg.chatId === activeChatId) {
-      setMessages((prev) => {
-        // Optimistic item ko real server message se replace karein
-        const filtered = prev.filter((m) => m._id !== newMsg.tempId);
-        return [...filtered, newMsg];
-      });
-    }
-  });
+## 7. Step 6: MongoDB Compass Mein Data Dekhne Ka Tareeqa
 
-  return () => {
-    socket.off('message:created');
-  };
-}, [activeChatId]);
-```
+Jab aap registration form submit karte hain, to data Compass mein dekhne ke liye yeh steps follow karein:
+
+1. **MongoDB Compass** open karein aur `mongodb://localhost:27017` se connect karein.
+2. Left sidebar par **Refresh icon (⟳)** dabayein (taake nayi databases load ho jayein).
+3. Databases ki list mein **`chat_app`** database dhoondein:
+   > ⚠️ **Note:** Doosre projects ke databases (jaise `hr_management` ya `admin`) mein Chat App ka data nahi milega. Sirf **`chat_app`** kholna hai!
+4. **`chat_app`** ke andar **`users`** collection par click karein.
+5. Wahan aapko MongoDB documents is tarah milenge:
+   ```json
+   {
+     "_id": { "$oid": "6ab505998e4f0b765304127d" },
+     "name": "hasnain",
+     "email": "hasnain@gmail.com",
+     "passwordHash": "$2a$10$wK1RkY1...",
+     "status": "offline",
+     "createdAt": { "$date": "2026-09-24T11:28:40.000Z" }
+   }
+   ```
 
 ---
 
-## 8. WebRTC Calling Signaling (Day 4)
+## 8. Troubleshooting & Common Errors (With Solutions)
 
-Audio/Video call ke liye Socket.IO sirf **signaling channel** ka kaam karta hai:
+### Error 1: `Error: listen EADDRINUSE: address already in use :::5000`
+* **Wajah:** Port 5000 par backend pehle se background mein chal raha hai.
+* **Solution:** PowerShell mein port 5000 ka process dhoond kar kill karein:
+  ```powershell
+  # Port find karein:
+  netstat -ano | findstr :5000
+  # Task kill karein:
+  Stop-Process -Id <PID> -Force
+  ```
 
-1. **Call Offer:**
-   ```typescript
-   socket.emit('call:offer', {
-     callId,
-     toUserId,
-     sdp: peerConnection.localDescription,
-     mediaType: 'video' // ya 'audio'
-   });
-   ```
-2. **Call Answer:**
-   ```typescript
-   socket.emit('call:answer', {
-     callId,
-     toUserId,
-     sdp: peerConnection.localDescription
-   });
-   ```
-3. **ICE Candidates Relay:**
-   ```typescript
-   socket.emit('call:ice-candidate', {
-     callId,
-     toUserId,
-     candidate
-   });
-   ```
+### Error 2: `Cannot find module './vendor-chunks/axios.js'`
+* **Wajah:** Dev server chalte waqt production build chalane se `.next` ka webpack cache mismatch ho jata hai.
+* **Solution:**
+  ```powershell
+  cd frontend
+  Remove-Item -Recurse -Force .next
+  npm run dev
+  ```
 
-Media actual mein browser-to-browser peer-to-peer WebRTC connection ke through stream hota hai.
+### Error 3: Registration par data DB mein nahi gaya
+* **Wajah:** Backend server band tha ya `frontend/.env.local` mein API URL set nahi tha.
+* **Solution:** Confirm karein ke backend terminal mein `[MongoDB Connected]: localhost` aur `Running on Port 5000` print ho raha ho.
 
 ---
 
-## 9. Common Errors & Troubleshooting
-
-### 1. `CORS Policy Error` in Browser Console
-* **Wajah:** Backend mein frontend ka URL match nahi kar raha.
-* **Solution:** `backend/.env` mein `CLIENT_URL=http://localhost:3001` (ya jo port browser mein open hai) set karein aur backend restart karein.
-
-### 2. `Socket authentication error: Token missing`
-* **Wajah:** Socket connect karte waqt `auth: { token }` pass nahi ho raha.
-* **Solution:** Confirm karein ke user login hone ke baad hi `getSocket()` call ho, aur token `localStorage` mein maujood ho.
-
-### 3. `MongoServerError: connect ECONNREFUSED 127.0.0.1:27017`
-* **Wajah:** Local MongoDB service stop hai.
-* **Solution:** Terminal mein `net start MongoDB` run karein ya MongoDB Atlas cloud connection string use karein.
-
-### 4. `Port in use` (3000 / 5000)
-* Agar port busy ho to terminal se task check karke kill karein ya `.env` mein port change karein.
-
----
-
-### 🏁 Summary Checklist for Developers:
-* [x] Backend packages installed (`npm install` in `/backend`)
-* [x] Backend `.env` configured (`PORT=5000`, `CLIENT_URL=http://localhost:3001`)
-* [x] Frontend Login/Register pages ready
-* [ ] Start MongoDB
-* [ ] Run `cd backend && npm run dev`
-* [ ] Verify `/health` endpoint
-* [ ] Connect Frontend Auth form to Backend Auth API
+### 🚀 Complete System Status:
+* ✅ **Database:** MongoDB running on `27017` (Database: `chat_app`)
+* ✅ **Backend Server:** Node/Express running on `http://localhost:5000`
+* ✅ **Frontend App:** Next.js running on `http://localhost:3001`
+* ✅ **Authentication:** Connected directly to MongoDB via `/api/auth/register` and `/api/auth/login`
