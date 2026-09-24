@@ -1,0 +1,198 @@
+import { Request, Response, NextFunction } from 'express';
+import mongoose from 'mongoose';
+import { Chat } from '../models/Chat';
+import { Message } from '../models/Message';
+import { sendSuccess } from '../utils/apiResponse';
+import { ApiError } from '../utils/apiError';
+
+export const getChats = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const currentUserId = req.user?.userId;
+
+    const chats = await Chat.find({
+      participantIds: currentUserId,
+    })
+      .populate('participantIds', 'name email avatarUrl status lastSeenAt')
+      .populate('lastMessageId')
+      .sort({ updatedAt: -1 });
+
+    sendSuccess({
+      res,
+      data: chats,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const createOrGetDirectChat = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const currentUserId = req.user?.userId;
+    const { userId } = req.body;
+
+    if (!userId) {
+      throw new ApiError(400, 'Recipient userId is required', 'VALIDATION_ERROR');
+    }
+
+    if (userId === currentUserId) {
+      throw new ApiError(400, 'Cannot create a chat with yourself', 'INVALID_OPERATION');
+    }
+
+    // Check if 1:1 chat already exists
+    let chat = await Chat.findOne({
+      type: 'direct',
+      participantIds: { $all: [currentUserId, userId], $size: 2 },
+    })
+      .populate('participantIds', 'name email avatarUrl status lastSeenAt')
+      .populate('lastMessageId');
+
+    if (!chat) {
+      const newChat = await Chat.create({
+        type: 'direct',
+        participantIds: [currentUserId, userId],
+      });
+
+      chat = await Chat.findById(newChat._id)
+        .populate('participantIds', 'name email avatarUrl status lastSeenAt');
+    }
+
+    sendSuccess({
+      res,
+      statusCode: 200,
+      data: chat,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getChatMessages = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const chatId = req.params.chatId as string;
+    const currentUserId = req.user?.userId;
+    const limit = parseInt(req.query.limit as string) || 50;
+    const cursor = req.query.cursor as string;
+
+    const chat = await Chat.findById(chatId);
+    if (!chat) {
+      throw new ApiError(404, 'Chat not found', 'CHAT_NOT_FOUND');
+    }
+
+    // Ensure user is participant
+    const isMember = chat.participantIds.some((id) => id.toString() === currentUserId);
+    if (!isMember) {
+      throw new ApiError(403, 'Unauthorized to view this conversation', 'AUTH_FORBIDDEN');
+    }
+
+    const query: any = { chatId };
+    if (cursor) {
+      query.createdAt = { $lt: new Date(cursor) };
+    }
+
+    const messages = await Message.find(query)
+      .populate('senderId', 'name avatarUrl')
+      .sort({ createdAt: -1 })
+      .limit(limit);
+
+    const nextCursor = messages.length === limit ? messages[messages.length - 1].createdAt : null;
+
+    sendSuccess({
+      res,
+      data: messages.reverse(),
+      meta: { cursor: nextCursor },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const createMessage = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const chatId = req.params.chatId as string;
+    const currentUserId = req.user?.userId;
+    const { text, type = 'text', attachments = [], replyToId } = req.body;
+
+    const chat = await Chat.findById(chatId);
+    if (!chat) {
+      throw new ApiError(404, 'Chat not found', 'CHAT_NOT_FOUND');
+    }
+
+    if (!currentUserId) {
+      throw new ApiError(401, 'Unauthorized', 'AUTH_UNAUTHORIZED');
+    }
+
+    const isMember = chat.participantIds.some((id) => id.toString() === currentUserId);
+    if (!isMember) {
+      throw new ApiError(403, 'Unauthorized to post in this conversation', 'AUTH_FORBIDDEN');
+    }
+
+    const newMessage = await Message.create({
+      chatId: new mongoose.Types.ObjectId(chatId),
+      senderId: new mongoose.Types.ObjectId(currentUserId),
+      text,
+      type,
+      attachments,
+      replyToId: replyToId ? new mongoose.Types.ObjectId(replyToId) : undefined,
+      deliveredTo: [new mongoose.Types.ObjectId(currentUserId)],
+      readBy: [new mongoose.Types.ObjectId(currentUserId)],
+    });
+
+    chat.lastMessageId = newMessage._id as mongoose.Types.ObjectId;
+    await chat.save();
+
+    const populatedMessage = await Message.findById(newMessage._id).populate('senderId', 'name avatarUrl');
+
+    sendSuccess({
+      res,
+      statusCode: 201,
+      data: populatedMessage,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const toggleStarMessage = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const messageId = req.params.messageId as string;
+    const message = await Message.findById(messageId);
+
+    if (!message) {
+      throw new ApiError(404, 'Message not found', 'MESSAGE_NOT_FOUND');
+    }
+
+    message.isStarred = !message.isStarred;
+    await message.save();
+
+    sendSuccess({
+      res,
+      message: message.isStarred ? 'Message starred' : 'Message unstarred',
+      data: message,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getStarredMessages = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const currentUserId = req.user?.userId;
+    // Find all chats where user is participant
+    const userChats = await Chat.find({ participantIds: currentUserId }).select('_id');
+    const chatIds = userChats.map((c) => c._id);
+
+    const starredMessages = await Message.find({
+      chatId: { $in: chatIds },
+      isStarred: true,
+    })
+      .populate('senderId', 'name avatarUrl')
+      .sort({ createdAt: -1 });
+
+    sendSuccess({
+      res,
+      data: starredMessages,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
