@@ -182,11 +182,42 @@ export default function ChatDashboardPage() {
       }
     };
 
+    // Listen to message read receipts
+    const handleMessageRead = ({
+      chatId,
+      userId,
+    }: {
+      chatId: string;
+      userId: string;
+    }) => {
+      const currentActive = activeChatRef.current;
+      if (currentActive && currentActive._id === chatId) {
+        setMessages((prev) =>
+          prev.map((m) => ({
+            ...m,
+            readBy: Array.from(new Set([...(m.readBy || []), userId])),
+          }))
+        );
+      }
+    };
+
+    // Listen to edited message updates
+    const handleMessageUpdated = (updatedMsg: IMessage) => {
+      const currentActive = activeChatRef.current;
+      if (currentActive && currentActive._id === updatedMsg.chatId) {
+        setMessages((prev) =>
+          prev.map((m) => (m._id === updatedMsg._id ? updatedMsg : m))
+        );
+      }
+    };
+
     socket.on("message:created", handleNewMessage);
     socket.on("chat:updated", handleChatUpdated);
     socket.on("presence:update", handlePresenceUpdate);
     socket.on("typing:start", handleTypingStart);
     socket.on("typing:stop", handleTypingStop);
+    socket.on("message:read", handleMessageRead);
+    socket.on("message:updated", handleMessageUpdated);
 
     return () => {
       socket.off("message:created", handleNewMessage);
@@ -194,6 +225,8 @@ export default function ChatDashboardPage() {
       socket.off("presence:update", handlePresenceUpdate);
       socket.off("typing:start", handleTypingStart);
       socket.off("typing:stop", handleTypingStop);
+      socket.off("message:read", handleMessageRead);
+      socket.off("message:updated", handleMessageUpdated);
     };
   }, [isAuthenticated, user?._id, fetchChats]);
 
@@ -216,8 +249,11 @@ export default function ChatDashboardPage() {
       try {
         const res = await api.get(`/api/chats/${currentChatId}/messages?limit=50`);
         const fetchedMessages: IMessage[] = res.data?.data || res.data || [];
-        // Backend returns descending by createdAt (-1), reverse for chronological display
-        setMessages([...fetchedMessages].reverse());
+        // Backend already delivers messages in chronological order (oldest first)
+        setMessages(fetchedMessages);
+
+        // Mark messages as read in backend
+        api.post(`/api/chats/${currentChatId}/read`).catch(() => {});
       } catch (err: unknown) {
         console.error("Failed to load messages:", err);
         toast.error("Failed to load chat history");

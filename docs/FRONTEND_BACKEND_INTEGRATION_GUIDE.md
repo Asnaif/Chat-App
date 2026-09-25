@@ -526,10 +526,103 @@ Day 2 mein jin files mein kaam hua hai unka mukammal tafseel darj zail hai:
 
 ---
 
+## 10. Complete Day 2 Full-Stack Integration (Backend GitHub Sync + Frontend)
+
+Is section mein explain kiya gaya hai ke Backend repo se aane wale Day 2 ke code ko Frontend ke sath kis tarah mukammal taur par integrate kiya gaya hai.
+
+### 10.1 Backend Se Aane Wali Files (Merged from GitHub `feature/DayTwo`):
+1. **[`backend/docs/API_CONTRACT.md`](file:///c:/Users/Lenovo/Documents/psw/Chat-App/backend/docs/API_CONTRACT.md):** Tamam REST endpoints ka standard format (`success`, `data`, `meta`).
+2. **[`backend/docs/SOCKET_CONTRACT.md`](file:///c:/Users/Lenovo/Documents/psw/Chat-App/backend/docs/SOCKET_CONTRACT.md):** Tamam WebSocket events ke payloads aur rooms definition.
+3. **[`backend/src/controllers/chat.controller.ts`](file:///c:/Users/Lenovo/Documents/psw/Chat-App/backend/src/controllers/chat.controller.ts):** `getChats`, `createOrGetDirectChat`, `getChatMessages`, `createMessage`, `markChatAsRead`, `toggleStarMessage`, `editMessage`, `deleteMessage`.
+4. **[`backend/src/routes/chats.routes.ts`](file:///c:/Users/Lenovo/Documents/psw/Chat-App/backend/src/routes/chats.routes.ts):** Protected routes for conversations.
+5. **[`backend/src/routes/messages.routes.ts`](file:///c:/Users/Lenovo/Documents/psw/Chat-App/backend/src/routes/messages.routes.ts):** Star, edit, delete message routes.
+6. **[`backend/src/sockets/index.ts`](file:///c:/Users/Lenovo/Documents/psw/Chat-App/backend/src/sockets/index.ts):** `getIO()` export taake REST controller bhi socket par live message emit kar sake.
+
+---
+
+### 10.2 Frontend ↔ Backend Live Mapping (Kon Sa Component Kis API/Socket Se Juda Hai)
+
+```
+┌─────────────────────────────────────────┬──────────────────────────────────────────┬────────────────────────────────────────────────────────┐
+│ Frontend File / Component               │ Backend Route / Socket Event             │ Kaam Aur Integration Ka Tareeqa                         │
+├─────────────────────────────────────────┼──────────────────────────────────────────┼────────────────────────────────────────────────────────┤
+│ 1. ChatSidebar.tsx                      │ GET /api/chats                           │ Mount hote hi logged-in user ki sab chats fetch karta  │
+│                                         │                                          │ hai aur dynamic list render karta hai.                 │
+├─────────────────────────────────────────┼──────────────────────────────────────────┼────────────────────────────────────────────────────────┤
+│ 2. NewChatModal.tsx                     │ GET /api/users?search=<query>            │ Real-time search query se registered users dhoondta    │
+│                                         │                                          │ hai.                                                   │
+├─────────────────────────────────────────┼──────────────────────────────────────────┼────────────────────────────────────────────────────────┤
+│ 3. NewChatModal.tsx                     │ POST /api/chats { userId }               │ Naya direct conversation create karta hai aur          │
+│                                         │                                          │ foran chat open karta hai.                             │
+├─────────────────────────────────────────┼──────────────────────────────────────────┼────────────────────────────────────────────────────────┤
+│ 4. ChatWindow.tsx                       │ GET /api/chats/:chatId/messages?limit=50 │ Selected chat ki 50 messages history chronologically   │
+│                                         │                                          │ load karta hai.                                        │
+├─────────────────────────────────────────┼──────────────────────────────────────────┼────────────────────────────────────────────────────────┤
+│ 5. app/chat/page.tsx                    │ POST /api/chats/:chatId/read             │ Chat open hone par messages ko read mark karta hai     │
+│                                         │                                          │ aur unread badge ko 0 karta hai.                       │
+├─────────────────────────────────────────┼──────────────────────────────────────────┼────────────────────────────────────────────────────────┤
+│ 6. app/chat/page.tsx                    │ Socket: 'chat:join' { chatId }           │ User ko `chat:{chatId}` socket room mein daalta hai    │
+│                                         │                                          │ taake live messages foran mil sakein.                  │
+├─────────────────────────────────────────┼──────────────────────────────────────────┼────────────────────────────────────────────────────────┤
+│ 7. MessageInput.tsx                     │ Socket: 'message:send'                   │ Optimistic tempId ke sath message emit karta hai.      │
+│                                         │ Fallback: POST /api/chats/:id/messages   │ Agar socket disconnected ho to REST API fallback chalta│
+├─────────────────────────────────────────┼──────────────────────────────────────────┼────────────────────────────────────────────────────────┤
+│ 8. app/chat/page.tsx                    │ Socket: 'message:created'                │ Backend se verified message aane par UI ka optimistic  │
+│                                         │                                          │ bubble replace karta hai aur auto-scroll karta hai.    │
+├─────────────────────────────────────────┼──────────────────────────────────────────┼────────────────────────────────────────────────────────┤
+│ 9. app/chat/page.tsx                    │ Socket: 'chat:updated'                   │ Agar kisi background chat mein message aaye to         │
+│                                         │                                          │ sidebar mein preview update karta hai.                 │
+├─────────────────────────────────────────┼──────────────────────────────────────────┼────────────────────────────────────────────────────────┤
+│ 10. MessageInput.tsx                    │ Socket: 'typing:start' & 'typing:stop'   │ 2-sec debounce ke sath user ke type karne ka status    │
+│                                         │                                          │ saamne wale user ko broadcast karta hai.               │
+├─────────────────────────────────────────┼──────────────────────────────────────────┼────────────────────────────────────────────────────────┤
+│ 11. NavigationRail.tsx                  │ Socket: 'presence:update'                │ Connected users ke online/offline hone par green       │
+│     & ChatSidebar.tsx                   │                                          │ presence dot instantly toggle karta hai.               │
+├─────────────────────────────────────────┼──────────────────────────────────────────┼────────────────────────────────────────────────────────┤
+│ 12. MessageBubble.tsx                   │ Socket: 'message:read'                   │ Saamne wale user ne message parh liya to double blue/  │
+│                                         │                                          │ green ticks show karta hai.                            │
+└─────────────────────────────────────────┴──────────────────────────────────────────┴────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 10.3 End-to-End Real-Time Execution Lifecycle:
+
+1. **Step 1 (User Connects):**
+   - User `http://localhost:3000/chat` par aata hai.
+   - `getSocket()` function `localStorage.getItem('cm_chat_token')` ke sath `http://localhost:5000` se connect hota hai.
+   - Backend user ko uske personal channel `user:{userId}` mein add karta hai aur presence `status: "online"` broadcast karta hai.
+   - Sabhi users ke screens par is user ke avatar par **Green Dot** glow karne lagti hai.
+
+2. **Step 2 (Conversations Load):**
+   - Frontend `GET /api/chats` call karta hai.
+   - MongoDB se existing chats return hoti hain aur `ChatSidebar` populate hota hai.
+
+3. **Step 3 (User Opens Chat):**
+   - User kisi contact par click karta hai.
+   - Frontend emit karta hai `chat:join { chatId }`.
+   - Frontend call karta hai `GET /api/chats/:chatId/messages?limit=50`.
+   - Messages stream mein load hote hain aur window smooth scroll karke latest message par pahunchti hai.
+   - Frontend call karta hai `POST /api/chats/:chatId/read` taake unread messages clear hon aur doosre user ko read receipts mil jayein.
+
+4. **Step 4 (Sending Message):**
+   - User input box mein text type karke **Send** dabata hai.
+   - UI foran ek local temporary bubble render karta hai (`isPending: true`) — **Zero Lag**.
+   - Socket par `message:send` emit hota hai.
+   - Backend message ko MongoDB mein save karta hai, `chat.lastMessageId` update karta hai, aur room `chat:{chatId}` mein `message:created` broadcast karta hai.
+   - Frontend par `tempId` match hokar message official ID ke sath replace ho jata hai aur clock icon tick mark (✓) ban jata hai.
+
+5. **Step 5 (Recipient Receives Live Message):**
+   - Recipient agar us waqt usi chat window mein hai, to uski screen par bina page reload kiye live message bubble display ho jata hai aur sound/scroll trigger hota hai.
+   - Recipient agar kisi doosri screen par hai, to sidebar mein unread badge (+1) barh jata hai aur chat sabse upar aa jati hai.
+
+---
+
 ### 🚀 Complete System Status:
 * ✅ **Database:** MongoDB running on `27017` (Database: `chat_app`)
 * ✅ **Backend Server:** Node/Express running on `http://localhost:5000`
 * ✅ **Frontend App:** Next.js running on `http://localhost:3000` / `3001`
 * ✅ **Day 1 Authentication:** Completed (Register, Login, JWT in localStorage)
-* ✅ **Day 2 Chat Core:** Fully implemented according to Figma specifications (Zero TypeScript / ESLint errors)
+* ✅ **Day 2 Chat Core (Full-Stack Integrated):** Backend APIs + WebSockets + Frontend UI completely synchronized with 0 errors.
+
 
