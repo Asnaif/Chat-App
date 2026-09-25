@@ -6,6 +6,15 @@ import { registerPresenceHandlers } from './presence.socket';
 import { registerChatHandlers } from './chat.socket';
 import { registerCallHandlers } from './call.socket';
 
+let ioInstance: Server | null = null;
+
+export const getIO = (): Server => {
+  if (!ioInstance) {
+    throw new Error('Socket.io has not been initialized yet');
+  }
+  return ioInstance;
+};
+
 export const initSocket = (httpServer: HttpServer): Server => {
   const io = new Server(httpServer, {
     cors: {
@@ -14,6 +23,8 @@ export const initSocket = (httpServer: HttpServer): Server => {
       credentials: true,
     },
   });
+
+  ioInstance = io;
 
   // Socket Auth Middleware
   io.use((socket: Socket, next) => {
