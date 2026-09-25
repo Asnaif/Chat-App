@@ -627,15 +627,34 @@ POST   /api/upload
 | 🌙 Evening | Chat API Integration | GET conversations API se chat list load karo |
 | 🌙 Evening | Messages Load | GET messages API se messages load karo jab chat open ho |
 
-**Day 2 Frontend Deliverables:**
+**Day 2 Frontend Deliverables (Detailed Architecture):**
 ```
-✅ Chat list sidebar (Figma match)
-✅ Chat window with message bubbles
-✅ Message input bar with send button
-✅ Socket.IO client connected
-✅ Real-time message send/receive working
-✅ Chat list loads from API
-✅ Messages load when chat opens
+✅ 1. NavigationRail (`components/chat/NavigationRail.tsx`):
+   - Branding logo, nav tabs (Chats, Contacts, Calls, Settings)
+   - User profile avatar + live presence dot + Logout action
+✅ 2. Chat List Sidebar (`components/chat/ChatSidebar.tsx`):
+   - Search filter, quick filter pills (All, Unread, Direct)
+   - Dynamic conversation cards (Avatar, online status, contact name, timestamp, last message snippet, unread counter)
+   - New Chat trigger button
+✅ 3. Contact Search & New Chat (`components/chat/NewChatModal.tsx`):
+   - Search registered contacts via GET `/api/users?search=`
+   - Instant direct chat creation via POST `/api/chats`
+✅ 4. Chat Detail Window (`components/chat/ChatWindow.tsx`):
+   - ChatHeader: Contact name, avatar, live online indicator, Voice/Video call action triggers
+   - MessageStream: Scrollable message container with Date pills (Today, Yesterday)
+   - Auto-scroll to latest message on render and real-time updates
+✅ 5. Message Bubbles (`components/chat/MessageBubble.tsx`):
+   - Sent: Right-aligned, Primary Blue (#2D6CDF), White text, checkmarks (✓, ✓✓)
+   - Received: Left-aligned, Dark Slate (#2A3142), Off-white text, timestamp
+✅ 6. Message Input Bar (`components/chat/MessageInput.tsx`):
+   - Dark theme input field, attachment & emoji triggers, send button, Enter-to-send support
+✅ 7. Empty State Screen (`components/chat/EmptyChatState.tsx`):
+   - Glassmorphic card, welcome graphics, feature badges, "Start New Conversation" button
+✅ 8. Socket.IO & API Integration (`app/chat/page.tsx`, `lib/socket.ts`):
+   - Connects with JWT token to ws://localhost:5000
+   - Emits: `chat:join`, `chat:leave`, `message:send`, `typing:start`, `typing:stop`
+   - Listens: `message:created`, `chat:updated`, `presence:update`, `typing:start`, `typing:stop`
+   - Optimistic message posting with tempId and instant UI updates
 ```
 
 #### 👤 BACKEND (Developer 2) — Day 2

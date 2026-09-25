@@ -18,7 +18,7 @@ export const getIO = (): Server => {
 export const initSocket = (httpServer: HttpServer): Server => {
   const io = new Server(httpServer, {
     cors: {
-      origin: ENV.CLIENT_URL,
+      origin: [ENV.CLIENT_URL, 'http://localhost:3000', 'http://localhost:3001'],
       methods: ['GET', 'POST'],
       credentials: true,
     },
