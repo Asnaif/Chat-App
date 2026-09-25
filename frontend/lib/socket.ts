@@ -3,15 +3,18 @@ import { io, Socket } from 'socket.io-client';
 let socket: Socket | null = null;
 
 export const getSocket = (): Socket => {
-  if (!socket) {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('cm_chat_token') : null;
+  const token = typeof window !== 'undefined' ? localStorage.getItem('cm_chat_token') : null;
 
+  if (!socket) {
     socket = io(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:5000', {
       auth: {
         token: token,
       },
-      transports: ['websocket'],
+      transports: ['websocket', 'polling'],
       autoConnect: true,
+      reconnection: true,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 1000,
     });
 
     socket.on('connect', () => {
@@ -19,8 +22,13 @@ export const getSocket = (): Socket => {
     });
 
     socket.on('connect_error', (err) => {
-      console.error('❌ Socket connection error:', err.message);
+      console.warn('⚠️ Socket connection warning:', err.message);
     });
+  } else if (!socket.connected) {
+    if (token) {
+      socket.auth = { token };
+    }
+    socket.connect();
   }
 
   return socket;

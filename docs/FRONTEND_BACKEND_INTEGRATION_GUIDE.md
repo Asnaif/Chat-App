@@ -302,8 +302,234 @@ Jab aap registration form submit karte hain, to data Compass mein dekhne ke liye
 
 ---
 
+## 9. Day 2 Frontend Implementation — Chat Core & Real-Time Guide
+
+Day 2 ka maqsad authentication ke baad **Chat Core** (Conversations list, 1:1 Chat window, Socket.IO live messaging) ko Figma design ke mutabiq complete integrate karna hai.
+
+### 9.1 Figma Design Specs & Color Palette Applied
+| Component | Color / Token | Value | Function |
+|---|---|---|---|
+| **Outer Base Background** | `dark.bg` | `#131722` | Pure app canvas ka dark color |
+| **Card / Surface** | `dark.surface` | `#1B202D` | Main chat window container |
+| **Sidebar / Panels** | `dark.card` | `#232A3B` | Conversation cards, search container |
+| **Accent Cards / Bubble** | `dark.secondary` | `#2A3142` | Received message bubbles & active highlights |
+| **Primary Blue** | `primary` | `#2D6CDF` | Sent message bubble, action buttons, glow |
+| **Online Badge** | `accent.green` | `#00D68F` / `#4CAF50` | Live user presence indicator |
+| **Borders** | `dark.border` | `#2F374A` | Clean subtle borders |
+
+---
+
+### 9.2 Frontend Component Architecture (`/frontend/components/chat/`)
+```
+frontend/app/chat/page.tsx (Main Chat Controller)
+│
+├── 1. NavigationRail.tsx
+│      ├── App Logo & Branding (CM Chat)
+│      ├── Nav Tabs: Chats, Contacts, Calls, Settings
+│      └── Logged-in User Avatar & Logout Trigger
+│
+├── 2. ChatSidebar.tsx
+│      ├── Header ("Messages") + Search Input
+│      ├── "New Chat" Trigger Button (Modal)
+│      └── Conversations List:
+│            ├── Avatar + Green Online Dot
+│            ├── Contact Name + Timestamp
+│            ├── Last message snippet preview
+│            └── Unread message counter badge
+│
+├── 3. ChatWindow.tsx (Active Conversation Panel)
+│      ├── ChatHeader.tsx (Avatar, Online Status, Call Icons, More Menu)
+│      ├── MessageStream (Scrollable container, auto-scroll to bottom)
+│      │     └── MessageBubble.tsx:
+│      │           ├── Sent: Right aligned, Blue (#2D6CDF), White text
+│      │           └── Received: Left aligned, Slate (#2A3142), Light text
+│      ├── TypingIndicator ("User is typing...")
+│      └── MessageInput.tsx (Text area, Emoji & Attachment triggers, Send button)
+│
+├── 4. EmptyChatState.tsx (Placeholder when no conversation is selected)
+│
+└── 5. NewChatModal.tsx (Search registered users & initiate 1:1 conversation)
+```
+
+---
+
+### 9.3 Data Flow & Socket.IO Lifecycle
+
+#### 1. Fetching Conversations:
+* **API:** `GET /api/chats`
+* User ke mount hote hi existing conversations load hoti hain aur sidebar populate hota hai.
+
+#### 2. Selecting a Chat:
+* **API:** `GET /api/chats/:chatId/messages?limit=50`
+* **Socket Event:** `socket.emit('chat:join', { chatId })`
+* Message history load hoti hai aur user real-time room join karta hai.
+
+#### 3. Sending a Message:
+* **Optimistic Update:** Instant bubble render with `isPending` state.
+* **Socket Event:**
+  ```javascript
+  socket.emit('message:send', {
+    chatId: activeChat._id,
+    text: messageText,
+    type: 'text',
+    tempId: uuid,
+  });
+  ```
+* **Fallback REST API:** `POST /api/chats/:chatId/messages` if socket disconnects.
+
+#### 4. Receiving Messages in Real-Time:
+* **Socket Event:** `socket.on('message:created', (message) => { ... })`
+* Agar current open chat ka message hai → Message stream mein add karo aur scroll to bottom.
+* Sidebar mein conversation ka `lastMessage` aur `updatedAt` instant update karo.
+
+#### 5. Online / Offline Presence:
+* **Socket Event:** `socket.on('presence:update', ({ userId, status, lastSeenAt }) => { ... })`
+* Sidebar aur Chat Header mein green online indicator instantly sync hota hai.
+
+---
+
+### 9.4 File-by-File Detailed Blueprint (Har File Ka Kaam, Access, Aur Flow)
+
+Day 2 mein jin files mein kaam hua hai unka mukammal tafseel darj zail hai:
+
+#### 1. 📄 `frontend/types/chat.ts` (TypeScript Data Contracts)
+* **Kahan Access/Import Ho Rahi Hai:**  
+  `app/chat/page.tsx`, `components/chat/ChatSidebar.tsx`, `components/chat/ChatWindow.tsx`, `components/chat/ChatHeader.tsx`, `components/chat/MessageBubble.tsx`, `components/chat/NewChatModal.tsx`
+* **Kya Ho Raha Hai:**  
+  Chat ecosystem ke tamam core interfaces define kiye gaye hain: `IUser`, `IChat`, `IMessage`, `IAttachment`.
+* **Kaise Kaam Karti Hai:**  
+  Frontend ko strong typing deta hai taake MongoDB ke Mongoose models (`participantIds`, `lastMessageId`, `text`, `status`, `tempId`) ke sath frontend ka state 100% align rahe aur runtime bugs na aayein.
+
+---
+
+#### 2. 🔌 `frontend/lib/socket.ts` (Socket.IO Client Engine)
+* **Kahan Access/Import Ho Rahi Hai:**  
+  `frontend/app/chat/page.tsx`
+* **Kya Ho Raha Hai:**  
+  Real-time WebSocket client connection ka singleton instance manage hota hai.
+* **Kaise Kaam Karti Hai:**  
+  `localStorage` se `cm_chat_token` uthata hai aur backend server (`http://localhost:5000`) ke sath WebSocket handshake karta hai. Agar connection toot jaye to auto-reconnect (10 attempts, 1s delay) karta hai aur disconnected hone par naya JWT token pass karta hai.
+
+---
+
+#### 3. 🧭 `frontend/components/chat/NavigationRail.tsx` (App Left Rail)
+* **Kahan Access/Import Ho Rahi Hai:**  
+  `frontend/app/chat/page.tsx` (Desktop par sabse left mein render hoti hai)
+* **Kya Ho Raha Hai:**  
+  Figma layout ka left-most 72px slim navigation bar.
+* **Kaise Kaam Karti Hai:**  
+  - CM Chat logo with gradient glow (`#2D6CDF` → `#5B8EFF`).
+  - Active tabs switch karti hai: *Chats*, *Contacts*, *Calls*, *Settings*.
+  - *Contacts* tab par click karne par `NewChatModal` trigger hota hai.
+  - Logged-in user ka avatar aur green presence dot show karta hai.
+  - Bottom par `LogOut` action button provide karta hai jo session clear karke `/login` bhej deta hai.
+
+---
+
+#### 4. 📋 `frontend/components/chat/ChatSidebar.tsx` (Conversations List)
+* **Kahan Access/Import Ho Rahi Hai:**  
+  `frontend/app/chat/page.tsx` (Navigation Rail ke sath middle column)
+* **Kya Ho Raha Hai:**  
+  User ki tamam conversations list, filters, aur active states ko render karta hai.
+* **Kaise Kaam Karti Hai:**  
+  - Live Search: Contact name ya chat title ke hisaab se instant client-side filtering.
+  - Quick Tabs: *All*, *Unread*, *Direct* messages filter.
+  - Conversation Card: Saamne wale user ka avatar, live **Green Online Dot** (`#00D68F`), Name, Last message ka snippet, timestamp (formatted via `date-fns`), aur unread counter badge.
+  - Click Event: User jab kisi chat par click karta hai to `onSelectChat(chat)` call karta hai, jisse active chat state update ho jati hai.
+  - Skeleton Loader: Data load hote waqt animated loading pulses dikhata hai.
+
+---
+
+#### 5. 🔍 `frontend/components/chat/NewChatModal.tsx` (Contact Search & Instant Chat)
+* **Kahan Access/Import Ho Rahi Hai:**  
+  `frontend/app/chat/page.tsx` (Sidebar ke `+` button ya Nav Rail ke Contacts icon se open hota hai)
+* **Kya Ho Raha Hai:**  
+  Naye registered users ko search karke foran nayi conversation start karne ka modal.
+* **Kaise Kaam Karti Hai:**  
+  User ke search box mein likhte hi 300ms debounce ke baad `GET /api/users?search=<term>` call hota hai. Jab user kisi contact ke "Chat" button par click karta hai, yeh `POST /api/chats` (`{ userId }`) request bhej kar MongoDB mein direct conversation create karta hai aur user ko direct us chat room mein daal deta hai.
+
+---
+
+#### 6. 👤 `frontend/components/chat/ChatHeader.tsx` (Active Chat Header)
+* **Kahan Access/Import Ho Rahi Hai:**  
+  `frontend/components/chat/ChatWindow.tsx` (Chat panel ke top par)
+* **Kya Ho Raha Hai:**  
+  Currently opened chat ke contact ki profile info aur action triggers.
+* **Kaise Kaam Karti Hai:**  
+  - Selected user ka avatar, name, aur live status (*"Online"* with pulsing green dot / *"Offline"*) dikhata hai.
+  - Voice Call 📞 aur Video Call 📹 UI icons provide karta hai (Day 4 call flow ke placeholders).
+  - Mobile screens par **Back Arrow** button show karta hai jisse user wapas conversations list par ja sake.
+
+---
+
+#### 7. 💬 `frontend/components/chat/MessageBubble.tsx` (Message Bubble UI)
+* **Kahan Access/Import Ho Rahi Hai:**  
+  `frontend/components/chat/ChatWindow.tsx` (Messages stream ke andar har message par loop hota hai)
+* **Kya Ho Raha Hai:**  
+  Individual message bubble ko Figma design ke exact colors aur alignment ke mutabiq render karta hai.
+* **Kaise Kaam Karti Hai:**  
+  - **Sent Messages (`isSelf === true`):** Screen ke right side par align, Primary Blue (`#2D6CDF`) background, white text, timestamp, aur checkmark status (clock icon agar sending pending ho, ✓ sent, ✓✓ delivered/read).
+  - **Received Messages (`isSelf === false`):** Screen ke left side par align, Slate Card (`#2A3142`) background, light text, timestamp.
+
+---
+
+#### 8. ⌨️ `frontend/components/chat/MessageInput.tsx` (Message Bar & Typing Trigger)
+* **Kahan Access/Import Ho Rahi Hai:**  
+  `frontend/components/chat/ChatWindow.tsx` (Chat window ke sabse bottom par)
+* **Kya Ho Raha Hai:**  
+  Text compose karne, typing status broadcast karne, aur send karne ka input area.
+* **Kaise Kaam Karti Hai:**  
+  - Input field mein type karte waqt socket par `typing:start` emit hota hai aur 2 second idle rehne par `typing:stop` emit hota hai.
+  - Blue circular **Send** button dabane par ya keyboard par **`Enter`** dabane par `onSendMessage(text)` call hota hai aur input clear ho jata hai.
+  - Attachment 📎 aur Emoji 😊 triggers ke action buttons provide karta hai.
+
+---
+
+#### 9. 📭 `frontend/components/chat/EmptyChatState.tsx` (Default No-Chat State)
+* **Kahan Access/Import Ho Rahi Hai:**  
+  `frontend/app/chat/page.tsx` (Right panel mein tab render hota hai jab user ne koi chat select na ki ho)
+* **Kya Ho Raha Hai:**  
+  Modern dark glassmorphic welcome graphic aur instructions screen.
+* **Kaise Kaam Karti Hai:**  
+  Glow background, security badges (*"End-to-End Secure"*, *"Real-time Sockets"*), aur *"Start a New Conversation"* CTA button display karta hai jo click karne par New Chat Modal open kar deta hai.
+
+---
+
+#### 10. 🖼️ `frontend/components/chat/ChatWindow.tsx` (Active Chat Window Master)
+* **Kahan Access/Import Ho Rahi Hai:**  
+  `frontend/app/chat/page.tsx` (Right panel jab koi chat active ho)
+* **Kya Ho Raha Hai:**  
+  Header, scrollable message stream, typing indicator, aur input bar ko encapsulate karta hai.
+* **Kaise Kaam Karti Hai:**  
+  - Messages ko date ke mutabiq group karke Date separators (*Today*, *Yesterday*, *Full Date*) lagata hai.
+  - `messagesEndRef` ke zariye naya message aane par ya chat open hone par automatically **Smooth Scroll to Bottom** kar deta hai.
+  - Doosra user jab type kare to animated typing indicator bubble (*"Alice is typing..."*) display karta hai.
+
+---
+
+#### 11. 🚀 `frontend/app/chat/page.tsx` (Full Chat App Controller)
+* **Kahan Access/Import Ho Rahi Hai:**  
+  Next.js App Router Page: URL `http://localhost:3000/chat`
+* **Kya Ho Raha Hai:**  
+  Poore Day 2 ka Central Controller jahan state management, REST APIs, aur Socket.IO events aapas mein synchronize hote hain.
+* **Kaise Kaam Karti Hai:**  
+  1. **Authentication Guard:** `useAuth()` check karke unauthenticated request ko `/login` redirect karta hai.
+  2. **Initial Fetch:** `GET /api/chats` se user ki sab conversations load karta hai.
+  3. **Chat Select & History:** Chat switch hone par purani room se `chat:leave` emit karke nayi room mein `chat:join` karta hai, aur `GET /api/chats/:chatId/messages?limit=50` se history la kar chronological order mein set karta hai.
+  4. **Optimistic Message Sending:** User jab send dabata hai, instant UI mein temporary bubble create hota hai (`isPending: true`), aur background mein socket par `message:send` (ya REST API fallback) trigger hota hai.
+  5. **Real-time Event Listeners:**
+     - `message:created`: Naya message aane par active chat thread mein bubble inject karta hai aur sidebar mein chat ko sabse upar le aata hai.
+     - `chat:updated`: Background chat ka message update karta hai.
+     - `presence:update`: Users ke online/offline aane par live green dots sync karta hai.
+     - `typing:start` / `typing:stop`: Typing indicator toggle karta hai.
+  6. **Responsive UX:** Mobile devices par jab chat open ho to sidebar hide karke full screen chat dikhata hai, aur Back button dabane par wapas sidebar par switch karta hai.
+
+---
+
 ### 🚀 Complete System Status:
 * ✅ **Database:** MongoDB running on `27017` (Database: `chat_app`)
 * ✅ **Backend Server:** Node/Express running on `http://localhost:5000`
-* ✅ **Frontend App:** Next.js running on `http://localhost:3001`
-* ✅ **Authentication:** Connected directly to MongoDB via `/api/auth/register` and `/api/auth/login`
+* ✅ **Frontend App:** Next.js running on `http://localhost:3000` / `3001`
+* ✅ **Day 1 Authentication:** Completed (Register, Login, JWT in localStorage)
+* ✅ **Day 2 Chat Core:** Fully implemented according to Figma specifications (Zero TypeScript / ESLint errors)
+
