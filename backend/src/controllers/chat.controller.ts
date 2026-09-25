@@ -2,6 +2,8 @@ import { Request, Response, NextFunction } from 'express';
 import mongoose from 'mongoose';
 import { Chat } from '../models/Chat';
 import { Message } from '../models/Message';
+import { Block } from '../models/Block';
+import { Attachment } from '../models/Attachment';
 import { sendSuccess } from '../utils/apiResponse';
 import { ApiError } from '../utils/apiError';
 import { getIO } from '../sockets';
@@ -127,6 +129,22 @@ export const createMessage = async (req: Request, res: Response, next: NextFunct
       throw new ApiError(403, 'Unauthorized to post in this conversation', 'AUTH_FORBIDDEN');
     }
 
+    // Day 3: Enforce Block permission in direct chats
+    if (chat.type === 'direct') {
+      const recipientId = chat.participantIds.find((id) => id.toString() !== currentUserId);
+      if (recipientId) {
+        const isBlocked = await Block.exists({
+          $or: [
+            { ownerId: recipientId, blockedUserId: currentUserId },
+            { ownerId: currentUserId, blockedUserId: recipientId },
+          ],
+        });
+        if (isBlocked) {
+          throw new ApiError(403, 'Cannot send message because one of the users has blocked the other', 'CHAT_BLOCKED');
+        }
+      }
+    }
+
     const newMessage = await Message.create({
       chatId: new mongoose.Types.ObjectId(chatId),
       senderId: new mongoose.Types.ObjectId(currentUserId),
@@ -137,6 +155,20 @@ export const createMessage = async (req: Request, res: Response, next: NextFunct
       deliveredTo: [new mongoose.Types.ObjectId(currentUserId)],
       readBy: [new mongoose.Types.ObjectId(currentUserId)],
     });
+
+    // Day 3: Persist attachments in dedicated collection for media gallery tracking
+    if (attachments && Array.isArray(attachments) && attachments.length > 0) {
+      const attachmentDocs = attachments.map((att: any) => ({
+        ownerId: new mongoose.Types.ObjectId(currentUserId),
+        messageId: newMessage._id,
+        storageUrl: att.storageUrl,
+        publicId: att.publicId,
+        mimeType: att.mimeType || 'application/octet-stream',
+        size: att.size || 0,
+        name: att.name || 'attachment',
+      }));
+      await Attachment.insertMany(attachmentDocs);
+    }
 
     chat.lastMessageId = newMessage._id as mongoose.Types.ObjectId;
     await chat.save();
@@ -324,6 +356,48 @@ export const getStarredMessages = async (req: Request, res: Response, next: Next
     sendSuccess({
       res,
       data: starredMessages,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getChatMedia = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const chatId = req.params.chatId as string;
+    const currentUserId = req.user?.userId;
+    const type = req.query.type as string; // 'image' | 'video' | 'document' | 'audio' or undefined for all
+
+    const chat = await Chat.findById(chatId);
+    if (!chat) {
+      throw new ApiError(404, 'Chat not found', 'CHAT_NOT_FOUND');
+    }
+
+    const isMember = chat.participantIds.some((id) => id.toString() === currentUserId);
+    if (!isMember) {
+      throw new ApiError(403, 'Unauthorized to view media in this conversation', 'AUTH_FORBIDDEN');
+    }
+
+    const query: any = {
+      chatId,
+      deletedAt: { $exists: false },
+      $or: [
+        { type: { $in: ['image', 'video', 'document', 'audio'] } },
+        { 'attachments.0': { $exists: true } },
+      ],
+    };
+
+    if (type) {
+      query.type = type;
+    }
+
+    const mediaMessages = await Message.find(query)
+      .populate('senderId', 'name avatarUrl')
+      .sort({ createdAt: -1 });
+
+    sendSuccess({
+      res,
+      data: mediaMessages,
     });
   } catch (error) {
     next(error);

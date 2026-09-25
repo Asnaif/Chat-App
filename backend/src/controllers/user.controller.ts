@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { User } from '../models/User';
+import { Block } from '../models/Block';
 import { sendSuccess } from '../utils/apiResponse';
 import { ApiError } from '../utils/apiError';
 
@@ -69,6 +70,33 @@ export const searchUsers = async (req: Request, res: Response, next: NextFunctio
     sendSuccess({
       res,
       data: users,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getUserById = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const targetUserId = req.params.userId as string;
+    const currentUserId = req.user?.userId;
+
+    const user = await User.findById(targetUserId).select('-passwordHash');
+    if (!user) {
+      throw new ApiError(404, 'User not found', 'USER_NOT_FOUND');
+    }
+
+    const isBlocked = await Block.exists({
+      ownerId: currentUserId,
+      blockedUserId: targetUserId,
+    });
+
+    sendSuccess({
+      res,
+      data: {
+        ...user.toJSON(),
+        isBlocked: Boolean(isBlocked),
+      },
     });
   } catch (error) {
     next(error);
