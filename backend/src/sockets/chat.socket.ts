@@ -1,6 +1,9 @@
 import { Server, Socket } from 'socket.io';
+import mongoose from 'mongoose';
 import { Chat } from '../models/Chat';
 import { Message } from '../models/Message';
+import { Block } from '../models/Block';
+import { Attachment } from '../models/Attachment';
 
 export const registerChatHandlers = (io: Server, socket: Socket): void => {
   const userId = socket.data.user?.userId;
@@ -45,6 +48,27 @@ export const registerChatHandlers = (io: Server, socket: Socket): void => {
         const isMember = chat.participantIds.some((id) => id.toString() === userId);
         if (!isMember) return;
 
+        // Day 3: Block enforcement in direct chats
+        if (chat.type === 'direct') {
+          const recipientId = chat.participantIds.find((id) => id.toString() !== userId);
+          if (recipientId) {
+            const isBlocked = await Block.exists({
+              $or: [
+                { ownerId: recipientId, blockedUserId: userId },
+                { ownerId: userId, blockedUserId: recipientId },
+              ],
+            });
+            if (isBlocked) {
+              socket.emit('chat:error', {
+                chatId,
+                code: 'CHAT_BLOCKED',
+                message: 'Cannot send message because one of the users has blocked the other',
+              });
+              return;
+            }
+          }
+        }
+
         const newMessage = await Message.create({
           chatId,
           senderId: userId,
@@ -55,7 +79,20 @@ export const registerChatHandlers = (io: Server, socket: Socket): void => {
           readBy: [userId],
         });
 
-        chat.lastMessageId = newMessage._id;
+        if (attachments && Array.isArray(attachments) && attachments.length > 0) {
+          const attachmentDocs = attachments.map((att: any) => ({
+            ownerId: new mongoose.Types.ObjectId(userId),
+            messageId: newMessage._id,
+            storageUrl: att.storageUrl,
+            publicId: att.publicId,
+            mimeType: att.mimeType || 'application/octet-stream',
+            size: att.size || 0,
+            name: att.name || 'attachment',
+          }));
+          await Attachment.insertMany(attachmentDocs);
+        }
+
+        chat.lastMessageId = newMessage._id as mongoose.Types.ObjectId;
         await chat.save();
 
         const populatedMessage = await Message.findById(newMessage._id).populate(

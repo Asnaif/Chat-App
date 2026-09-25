@@ -6,6 +6,8 @@ import { Setting } from '../models/Setting';
 import { Chat } from '../models/Chat';
 import { Message } from '../models/Message';
 import { Group } from '../models/Group';
+import { Attachment } from '../models/Attachment';
+import { Block } from '../models/Block';
 
 const seedDatabase = async (): Promise<void> => {
   try {
@@ -23,6 +25,8 @@ const seedDatabase = async (): Promise<void> => {
       Chat.deleteMany({}),
       Message.deleteMany({}),
       Group.deleteMany({}),
+      Attachment.deleteMany({}),
+      Block.deleteMany({}),
     ]);
     console.log(' Existing collections cleared.');
 
@@ -128,10 +132,23 @@ const seedDatabase = async (): Promise<void> => {
         chatId: directChat._id,
         senderId: bob._id,
         type: 'text' as const,
-        text: 'Great, let me know if you need any extra fields in the response!',
-        isStarred: false,
+      },
+      {
+        chatId: directChat._id,
+        senderId: bob._id,
+        type: 'image' as const,
+        text: 'Here is the Figma dashboard preview for our chat app! 🖼️',
+        attachments: [
+          {
+            storageUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop',
+            mimeType: 'image/jpeg',
+            size: 245000,
+            name: 'figma_preview.jpg',
+          },
+        ],
+        isStarred: true,
         deliveredTo: [alice._id],
-        readBy: [],
+        readBy: [alice._id],
         createdAt: new Date(),
       },
     ];
@@ -139,9 +156,19 @@ const seedDatabase = async (): Promise<void> => {
     const createdDirectMessages = await Message.insertMany(directMessages);
     const lastDirectMessage = createdDirectMessages[createdDirectMessages.length - 1];
 
+    // Seed Attachment for the media message
+    await Attachment.create({
+      ownerId: bob._id,
+      messageId: lastDirectMessage._id,
+      storageUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop',
+      mimeType: 'image/jpeg',
+      size: 245000,
+      name: 'figma_preview.jpg',
+    });
+
     directChat.lastMessageId = lastDirectMessage._id;
     await directChat.save();
-    console.log(' Direct chat and messages created.');
+    console.log(' Direct chat and messages (including media attachment) created.');
 
     // 7. Create Group Chat ("Dev Squad")
     console.log('👥 Creating Group Chat ("Dev Squad")...');
