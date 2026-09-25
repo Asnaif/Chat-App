@@ -40,6 +40,9 @@ const config: Config = {
         glow: "0 0 20px -5px rgba(45, 108, 223, 0.4)",
         card: "0 8px 32px 0 rgba(0, 0, 0, 0.36)",
       },
+      fontFamily: {
+        sans: ["var(--font-inter)", "sans-serif"],
+      },
     },
   },
   plugins: [],
