@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useRef, useEffect } from "react";
-import { IChat, IMessage, IUser } from "@/types/chat";
+import { IChat, IMessage, IUser, IAttachment } from "@/types/chat";
 import { User } from "@/context/AuthContext";
 import { ChatHeader } from "./ChatHeader";
 import { MessageBubble } from "./MessageBubble";
@@ -17,10 +17,15 @@ interface ChatWindowProps {
   isOnline: boolean;
   isTyping: boolean;
   typingUserName?: string;
-  onSendMessage: (text: string) => void;
+  onSendMessage: (
+    text: string,
+    type?: "text" | "image" | "video" | "audio" | "document",
+    attachments?: IAttachment[]
+  ) => void;
   onTypingStart: () => void;
   onTypingStop: () => void;
   onBack: () => void;
+  onStartCall?: (type: "audio" | "video") => void;
 }
 
 export const ChatWindow: React.FC<ChatWindowProps> = ({
@@ -35,6 +40,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   onTypingStart,
   onTypingStop,
   onBack,
+  onStartCall,
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -109,6 +115,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         currentUser={currentUser}
         isOnline={isOnline}
         onBack={onBack}
+        onStartCall={onStartCall}
       />
 
       {/* Messages Stream */}

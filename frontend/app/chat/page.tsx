@@ -5,12 +5,14 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/api";
 import { getSocket } from "@/lib/socket";
-import { IChat, IMessage } from "@/types/chat";
+import { IChat, IMessage, IAttachment } from "@/types/chat";
 import { NavigationRail } from "@/components/chat/NavigationRail";
 import { ChatSidebar } from "@/components/chat/ChatSidebar";
 import { ChatWindow } from "@/components/chat/ChatWindow";
 import { EmptyChatState } from "@/components/chat/EmptyChatState";
 import { NewChatModal } from "@/components/chat/NewChatModal";
+import { CallModal, ActiveCallData } from "@/components/chat/CallModal";
+import { CallsView } from "@/components/chat/CallsView";
 import toast from "react-hot-toast";
 
 export default function ChatDashboardPage() {
@@ -32,6 +34,7 @@ export default function ChatDashboardPage() {
   const [isNewChatOpen, setIsNewChatOpen] = useState<boolean>(false);
   const [isTyping, setIsTyping] = useState<boolean>(false);
   const [typingUserName, setTypingUserName] = useState<string>("");
+  const [activeCall, setActiveCall] = useState<ActiveCallData | null>(null);
 
   const activeChatRef = useRef<IChat | null>(null);
   activeChatRef.current = activeChat;
@@ -211,6 +214,33 @@ export default function ChatDashboardPage() {
       }
     };
 
+    // Listen to incoming call
+    const handleCallIncoming = ({
+      callId,
+      callerId,
+      callerName,
+      callerAvatar,
+      sdp,
+      mediaType,
+    }: {
+      callId?: string;
+      callerId: string;
+      callerName: string;
+      callerAvatar?: string;
+      sdp: RTCSessionDescriptionInit;
+      mediaType: "audio" | "video";
+    }) => {
+      setActiveCall({
+        callId,
+        partnerId: callerId,
+        partnerName: callerName || "Incoming Caller",
+        partnerAvatar: callerAvatar,
+        type: mediaType || "audio",
+        isIncoming: true,
+        sdpOffer: sdp,
+      });
+    };
+
     socket.on("message:created", handleNewMessage);
     socket.on("chat:updated", handleChatUpdated);
     socket.on("presence:update", handlePresenceUpdate);
@@ -218,6 +248,7 @@ export default function ChatDashboardPage() {
     socket.on("typing:stop", handleTypingStop);
     socket.on("message:read", handleMessageRead);
     socket.on("message:updated", handleMessageUpdated);
+    socket.on("call:incoming", handleCallIncoming);
 
     return () => {
       socket.off("message:created", handleNewMessage);
@@ -227,6 +258,7 @@ export default function ChatDashboardPage() {
       socket.off("typing:stop", handleTypingStop);
       socket.off("message:read", handleMessageRead);
       socket.off("message:updated", handleMessageUpdated);
+      socket.off("call:incoming", handleCallIncoming);
     };
   }, [isAuthenticated, user?._id, fetchChats]);
 
@@ -275,7 +307,11 @@ export default function ChatDashboardPage() {
   }, [activeChat]);
 
   // Send Message Handler (Optimistic + Socket + API fallback)
-  const handleSendMessage = async (text: string) => {
+  const handleSendMessage = async (
+    text: string,
+    type: "text" | "image" | "video" | "audio" | "document" = "text",
+    attachments?: IAttachment[]
+  ) => {
     if (!activeChat || !user) return;
 
     const currentChatId = activeChat._id;
@@ -292,7 +328,8 @@ export default function ChatDashboardPage() {
         status: "online",
       },
       text,
-      type: "text",
+      type,
+      attachments,
       createdAt: new Date().toISOString(),
       isPending: true,
     };
@@ -319,14 +356,16 @@ export default function ChatDashboardPage() {
         chatId: currentChatId,
         tempId,
         text,
-        type: "text",
+        type,
+        attachments,
       });
     } else {
       // Fallback to REST API
       try {
         const res = await api.post(`/api/chats/${currentChatId}/messages`, {
           text,
-          type: "text",
+          type,
+          attachments,
         });
         const savedMsg: IMessage = res.data?.data || res.data;
         if (savedMsg) {
@@ -377,6 +416,19 @@ export default function ChatDashboardPage() {
     ? onlineUserIds.has(otherParticipant._id) || otherParticipant.status === "online"
     : false;
 
+  const handleStartCall = (
+    partner: { _id: string; name: string; avatarUrl?: string },
+    type: "audio" | "video"
+  ) => {
+    setActiveCall({
+      partnerId: partner._id,
+      partnerName: partner.name,
+      partnerAvatar: partner.avatarUrl,
+      type,
+      isIncoming: false,
+    });
+  };
+
   return (
     <div className="h-screen w-screen bg-[#131722] text-white flex overflow-hidden font-sans">
       {/* 1. Left-most Navigation Rail (Hidden on small screens when in chat) */}
@@ -384,28 +436,37 @@ export default function ChatDashboardPage() {
         <NavigationRail
           user={user}
           activeTab={activeTab}
-          setActiveTab={setActiveTab}
+          setActiveTab={(tab) => {
+            setActiveTab(tab);
+            if (tab === "calls") {
+              setActiveChat(null);
+            }
+          }}
           onLogout={handleLogout}
           onOpenNewChat={() => setIsNewChatOpen(true)}
         />
       </div>
 
-      {/* 2. Conversations Sidebar (Hidden on mobile if a chat is actively selected) */}
-      <div className={`${activeChat ? "hidden md:flex" : "flex"} flex-1 md:flex-initial h-full`}>
-        <ChatSidebar
-          currentUser={user}
-          chats={chats}
-          activeChat={activeChat}
-          onlineUserIds={onlineUserIds}
-          onSelectChat={(chat) => setActiveChat(chat)}
-          onOpenNewChat={() => setIsNewChatOpen(true)}
-          loading={loadingChats}
-        />
-      </div>
+      {/* 2. Conversations Sidebar (Hidden on mobile if a chat is actively selected, or when in calls tab) */}
+      {activeTab !== "calls" && (
+        <div className={`${activeChat ? "hidden md:flex" : "flex"} flex-1 md:flex-initial h-full`}>
+          <ChatSidebar
+            currentUser={user}
+            chats={chats}
+            activeChat={activeChat}
+            onlineUserIds={onlineUserIds}
+            onSelectChat={(chat) => setActiveChat(chat)}
+            onOpenNewChat={() => setIsNewChatOpen(true)}
+            loading={loadingChats}
+          />
+        </div>
+      )}
 
-      {/* 3. Main Chat Area / Empty State (Full screen on mobile when active) */}
-      <main className={`${activeChat ? "flex" : "hidden md:flex"} flex-1 h-full overflow-hidden`}>
-        {activeChat ? (
+      {/* 3. Main Workspace Area: Calls View, Active Chat, or Empty State */}
+      <main className={`${activeChat || activeTab === "calls" ? "flex" : "hidden md:flex"} flex-1 h-full overflow-hidden`}>
+        {activeTab === "calls" ? (
+          <CallsView currentUser={user} onStartCall={handleStartCall} />
+        ) : activeChat ? (
           <ChatWindow
             chat={activeChat}
             currentUser={user}
@@ -418,6 +479,11 @@ export default function ChatDashboardPage() {
             onTypingStart={handleTypingStart}
             onTypingStop={handleTypingStop}
             onBack={() => setActiveChat(null)}
+            onStartCall={(type) => {
+              if (otherParticipant) {
+                handleStartCall(otherParticipant, type);
+              }
+            }}
           />
         ) : (
           <EmptyChatState onOpenNewChat={() => setIsNewChatOpen(true)} />
@@ -429,13 +495,20 @@ export default function ChatDashboardPage() {
         isOpen={isNewChatOpen}
         onClose={() => setIsNewChatOpen(false)}
         onSelectChat={(newChat) => {
-          // Add to chats if not already there
           setChats((prev) => {
             if (prev.some((c) => c._id === newChat._id)) return prev;
             return [newChat, ...prev];
           });
           setActiveChat(newChat);
+          setActiveTab("chats");
         }}
+      />
+
+      {/* 5. WebRTC Calling Modal / Active Call Overlay */}
+      <CallModal
+        currentUser={user}
+        activeCall={activeCall}
+        onCloseCall={() => setActiveCall(null)}
       />
     </div>
   );

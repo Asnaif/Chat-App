@@ -11,6 +11,7 @@ interface ChatHeaderProps {
   currentUser: User | null;
   isOnline: boolean;
   onBack: () => void;
+  onStartCall?: (type: "audio" | "video") => void;
 }
 
 export const ChatHeader: React.FC<ChatHeaderProps> = ({
@@ -18,6 +19,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   currentUser,
   isOnline,
   onBack,
+  onStartCall,
 }) => {
   const otherUser: IUser | undefined = chat.participantIds.find(
     (p) => p._id !== currentUser?._id
@@ -26,10 +28,12 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   const title = chat.title || otherUser?.name || "Direct Chat";
   const avatarUrl = chat.avatarUrl || otherUser?.avatarUrl;
 
-  const handleCall = (type: "voice" | "video") => {
-    toast(`Day 4 Call Feature: ${type === "voice" ? "Voice" : "Video"} calling ${title}`, {
-      icon: type === "voice" ? "📞" : "📹",
-    });
+  const handleCall = (type: "audio" | "video") => {
+    if (onStartCall) {
+      onStartCall(type);
+    } else {
+      toast(`Calling ${title}...`, { icon: type === "audio" ? "📞" : "📹" });
+    }
   };
 
   return (
@@ -80,7 +84,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
       {/* Action Buttons */}
       <div className="flex items-center gap-1 sm:gap-2">
         <button
-          onClick={() => handleCall("voice")}
+          onClick={() => handleCall("audio")}
           className="w-9 h-9 rounded-xl flex items-center justify-center text-text-secondary hover:text-white hover:bg-[#232A3B] transition-colors"
           title="Voice Call"
         >

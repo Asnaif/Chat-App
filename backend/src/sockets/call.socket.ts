@@ -11,11 +11,13 @@ export const registerCallHandlers = (io: Server, socket: Socket): void => {
       toUserId,
       sdp,
       mediaType = 'audio',
+      callerInfo,
     }: {
       callId?: string;
       toUserId: string;
       sdp: any;
       mediaType?: 'audio' | 'video';
+      callerInfo?: { name: string; avatarUrl?: string };
     }) => {
       try {
         let activeCall;
@@ -31,6 +33,8 @@ export const registerCallHandlers = (io: Server, socket: Socket): void => {
         io.to(`user:${toUserId}`).emit('call:incoming', {
           callId: callId || activeCall?._id,
           callerId: userId,
+          callerName: callerInfo?.name || 'Incoming Caller',
+          callerAvatar: callerInfo?.avatarUrl,
           sdp,
           mediaType,
         });
