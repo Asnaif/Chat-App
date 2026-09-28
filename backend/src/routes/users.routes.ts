@@ -8,6 +8,7 @@ router.use(authenticate);
 
 router.get('/me', getMe);
 router.patch('/me', updateMe);
+router.get('/search', searchUsers);
 router.get('/', searchUsers);
 router.get('/:userId', getUserById);
 

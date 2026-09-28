@@ -11,7 +11,8 @@
 5. [Step 4: Authentication Flow & MongoDB Storage Walkthrough](#5-step-4-authentication-flow--mongodb-storage-walkthrough)
 6. [Step 5: Real-Time Socket.IO Integration](#6-step-5-real-time-socketio-integration)
 7. [Step 6: MongoDB Compass Mein Data Dekhne Ka Tareeqa](#7-step-6-mongodb-compass-mein-data-dekhne-ka-tareeqa)
-8. [Troubleshooting & Common Errors (With Solutions)](#8-troubleshooting--common-errors-with-solutions)
+8. [Step 7: Day 3 Advanced Features Architecture & Implementation](#8-step-7-day-3-advanced-features-architecture--implementation)
+9. [Troubleshooting & Common Errors (With Solutions)](#9-troubleshooting--common-errors-with-solutions)
 
 ---
 
@@ -618,11 +619,326 @@ Is section mein explain kiya gaya hai ke Backend repo se aane wale Day 2 ke code
 
 ---
 
+## 8. Step 7: Day 3 Advanced Features Architecture & Implementation (Tafseel Se)
+
+Day 3 par hamari application mein WhatsApp-grade advanced chatting aur media features successfully integrate kiye gaye hain:
+1. **Real-Time Typing Indicator**
+2. **Message Status Ticks (Sent, Delivered, Read)**
+3. **Emoji Picker Integration**
+4. **Media Sharing & Image Upload (Multer + Cloudinary / Local Fallback)**
+5. **Image Lightbox & Document Preview**
+6. **Contacts View & Instant Search**
+7. **1-Click Start New Chat Flow**
+8. **Message Deletion Flow (For Me / For Everyone)**
+9. **MongoDB Database Persistence (Schema & Collection Proofs)**
+
+---
+
+### 8.1 💾 Data Database (MongoDB) Mein Save Ho Raha Hai Ya Nahi? (Tafseeli Jawab)
+
+**Haan, 100% data MongoDB database (`chat_app`) ke andar save aur persist ho raha hai!**
+
+Aapka bheja hua har message, photo, attachment, aur user state MongoDB ki specific collections mein permanently store hoti hai:
+
+```
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                              MONGODB DATABASE: `chat_app`                              │
+├────────────────────┬───────────────────────────────────────────────────────────────────┤
+│ Collection Name    │ Kya Save Hota Hai (Fields & Purpose)                              │
+├────────────────────┼───────────────────────────────────────────────────────────────────┤
+│ 1. `users`         │ User accounts, password hashes, avatarUrl, online/offline status  │
+│ 2. `chats`         │ Direct aur group conversations, participantIds, lastMessageId     │
+│ 3. `messages`      │ Har message ka text, type ('text'|'image'|'document'), chatId,   │
+│                    │ senderId, attachments list, deliveredTo, readBy, deletedAt        │
+│ 4. `attachments`   │ Uploaded files ki metadata: storageUrl, name, size, mimeType,     │
+│                    │ ownerId, messageId                                                │
+└────────────────────┴───────────────────────────────────────────────────────────────────┘
+```
+
+#### 🔍 Live MongoDB Database Query Proof (Jo Hamne Test Kiya):
+Jab aapne Emoji "😀" aur PDF file attach ki, to MongoDB mein foran yeh actual documents create huay:
+
+1. **`messages` Collection Document:**
+```json
+{
+  "_id": ObjectId("6ab7db0540644c55673b7990"),
+  "chatId": ObjectId("6ab6211d64c9e89fefda5291"),
+  "senderId": ObjectId("6ab6211464c9e89fefda5290"),
+  "text": "",
+  "type": "document",
+  "attachments": [
+    {
+      "storageUrl": "http://localhost:5000/uploads/1790434052996-g4pnrxh.pdf",
+      "publicId": "1790434052996-g4pnrxh.pdf",
+      "mimeType": "application/pdf",
+      "size": 655105,
+      "name": "Chat_Application_SRS_2_Developers_5_Day_Plan.pdf"
+    }
+  ],
+  "deliveredTo": [ObjectId("6ab6211464c9e89fefda5290")],
+  "readBy": [ObjectId("6ab6211464c9e89fefda5290")],
+  "createdAt": "2026-09-26T14:47:33.029Z"
+}
+```
+
+2. **`attachments` Collection Document:**
+```json
+{
+  "_id": ObjectId("6ab7db0540644c55673b7992"),
+  "ownerId": ObjectId("6ab6211464c9e89fefda5290"),
+  "messageId": ObjectId("6ab7db0540644c55673b7990"),
+  "storageUrl": "http://localhost:5000/uploads/1790434052996-g4pnrxh.pdf",
+  "mimeType": "application/pdf",
+  "size": 655105,
+  "name": "Chat_Application_SRS_2_Developers_5_Day_Plan.pdf",
+  "createdAt": "2026-09-26T14:47:33.041Z"
+}
+```
+
+Agar aap server band karke dobara chalayein, tab bhi page reload karne par yeh message history MongoDB se fetch hokar screen par aayegi kyunki yeh persistent database mein mehfooz hai.
+
+---
+
+### 8.2 🛠️ Day 3 Ke Har Feature Ki Full-Stack Integration Tafseel
+
+Har feature ko samajhne ke liye neeche har step explain kiya gaya hai: **Kon si file mein code hai**, **kahan se call hua**, **backend ne kya kiya**, aur **screen par kya display hua**.
+
+---
+
+#### 📌 Feature 1: Emoji Picker (Smiley Popover)
+
+* **Maqsad:** Chat compose karte waqt baghair kisi typing rukawat ke emojis select karna.
+* **Frontend File:** [`frontend/components/chat/MessageInput.tsx`](file:///c:/Users/Lenovo/Documents/psw/Chat-App/frontend/components/chat/MessageInput.tsx)
+* **Kahan Call Hua:** 
+  Input bar ke andar Smile button par click karne se `setShowEmojiPicker(prev => !prev)` trigger hota hai.
+* **Kese Kaam Kar Raha Hai:**
+  1. `emoji-picker-react` library ko Next.js ke andar dynamic import ke zariye load kiya gaya hai taake SSR (Server-Side Rendering) break na ho.
+  2. Dark Theme (`Theme.DARK`) use ki gayi hai jo app ke `#1B202D` design system se match karti hai.
+  3. Jab user kisi emoji par click karta hai to `handleEmojiClick(emojiData)` function call hota hai:
+     ```typescript
+     const handleEmojiClick = (emojiData: EmojiClickData) => {
+       setText((prev) => prev + emojiData.emoji);
+       inputRef.current?.focus(); // Input cursor focus retain rehta hai
+     };
+     ```
+  4. `useEffect` listener lagaya gaya hai ke jab user emoji picker ke bahar kisi bhi jagah click kare to picker automatically close ho jaye.
+
+---
+
+#### 📌 Feature 2: Image & File Upload Engine (Multer + Storage)
+
+* **Maqsad:** Local computer se images aur files backend par upload karke chat mein share karna.
+* **Involved Files:**
+  - **Frontend:** [`frontend/components/chat/MessageInput.tsx`](file:///c:/Users/Lenovo/Documents/psw/Chat-App/frontend/components/chat/MessageInput.tsx)
+  - **Backend Route:** [`backend/src/routes/uploads.routes.ts`](file:///c:/Users/Lenovo/Documents/psw/Chat-App/backend/src/routes/uploads.routes.ts)
+  - **Backend Controller:** [`backend/src/controllers/upload.controller.ts`](file:///c:/Users/Lenovo/Documents/psw/Chat-App/backend/src/controllers/upload.controller.ts)
+  - **Backend Server:** [`backend/src/app.ts`](file:///c:/Users/Lenovo/Documents/psw/Chat-App/backend/src/app.ts)
+* **Step-by-Step Execution Lifecycle:**
+  1. **User Selection:** User paperclip (📎) ya image (🖼️) button dabata hai. Hidden `<input type="file" />` trigger hota hai.
+  2. **Live Preview Banner:** File pick hote hi `handleFileSelect` function chalta hai. Agar image ho to `URL.createObjectURL(file)` se instant square thumbnail ban kar input box ke theek upar preview card ban jata hai jismein file ka naam, size (`KB`), aur cancel `X` button hota hai.
+  3. **Sending (HTTP POST):** User Send dabata hai to `handleSend()` multipart `FormData` create karta hai:
+     ```typescript
+     const formData = new FormData();
+     formData.append("file", selectedFile);
+     const res = await api.post("/api/upload", formData, {
+       headers: { "Content-Type": "multipart/form-data" }
+     });
+     ```
+  4. **Backend Processing:**
+     - Express route `POST /api/upload` par Multer middleware `uploadMiddleware.single('file')` file buffer memory mein pakadta hai.
+     - `uploadFile` controller check karta hai: Agar Cloudinary credentials hon to Cloudinary stream par upload karta hai. Agar na hon to automatic fallback ke taur par backend ke `uploads/` folder mein unique timestamp ke sath save karta hai.
+     - Backend response mein metadata return karta hai:
+       ```json
+       {
+         "storageUrl": "http://localhost:5000/uploads/1790434052996-g4pnrxh.pdf",
+         "mimeType": "application/pdf",
+         "size": 655105,
+         "name": "Chat_Application_SRS.pdf"
+       }
+       ```
+  5. **Static File Serving:** [`app.ts`](file:///c:/Users/Lenovo/Documents/psw/Chat-App/backend/src/app.ts) mein `app.use('/uploads', express.static(...))` laga hua hai jisse uploaded files kisi bhi browser se direct access ho sakti hain.
+
+---
+
+#### 📌 Feature 3: Media Messages Database Persistence & Real-Time Broadcast
+
+* **Involved Files:**
+  - **Frontend:** [`frontend/app/chat/page.tsx`](file:///c:/Users/Lenovo/Documents/psw/Chat-App/frontend/app/chat/page.tsx)
+  - **Backend Socket Handler:** [`backend/src/sockets/chat.socket.ts`](file:///c:/Users/Lenovo/Documents/psw/Chat-App/backend/src/sockets/chat.socket.ts)
+  - **Backend Model:** [`backend/src/models/Message.ts`](file:///c:/Users/Lenovo/Documents/psw/Chat-App/backend/src/models/Message.ts) & [`backend/src/models/Attachment.ts`](file:///c:/Users/Lenovo/Documents/psw/Chat-App/backend/src/models/Attachment.ts)
+* **Kese Kaam Karta Hai:**
+  1. Frontend socket par event emit karta hai:
+     ```javascript
+     socket.emit("message:send", {
+       chatId,
+       tempId,
+       text,
+       type: "image", // ya "document"
+       attachments: [uploadedAttachmentData]
+     });
+     ```
+  2. Backend `chat.socket.ts` mein pehle block check karta hai (`Block.exists`).
+  3. Phir MongoDB `Message.create` chalta hai jismein `attachments` array save hota hai.
+  4. Phir MongoDB `Attachment.insertMany` chalta hai jo attachments ko media gallery ke liye separate collection mein index karta hai.
+  5. Phir `Chat.findByIdAndUpdate` karke conversation ki `lastMessageId` update karta hai.
+  6. Akhir mein Socket room `chat:${chatId}` mein `message:created` broadcast karta hai jisse sabhi participants ke pass picture foran chat mein display ho jati hai.
+
+---
+
+#### 📌 Feature 4: Message Bubble Media Rendering & Lightbox Modal
+
+* **Maqsad:** Chat mein pictures aur files ko khoobsurat style mein dekhna aur click par full-screen zoom karna.
+* **Frontend File:** [`frontend/components/chat/MessageBubble.tsx`](file:///c:/Users/Lenovo/Documents/psw/Chat-App/frontend/components/chat/MessageBubble.tsx)
+* **Kese Kaam Karta Hai:**
+  - **Image Rendering:** Bubble check karta hai agar `att.mimeType.startsWith("image/")` ho, to image ko rounded borders aur hover zoom effect ke sath render karta hai.
+  - **Document Rendering:** Agar PDF ya text file ho, to download card banta hai jismein `FileText` icon, filename, formatted size (`640 KB`), aur download icon hota hai.
+  - **Full Screen Lightbox:** Image par click karne par state `selectedImage` set hoti hai aur dark backdrop (`bg-black/85 backdrop-blur-md`) ke sath poori screen par photo ka **Enlarged Lightbox Modal** open ho jata hai jise `X` button se close kiya ja sakta hai.
+
+---
+
+#### 📌 Feature 5: WhatsApp-Style Status Ticks (Sent, Delivered, Read)
+
+* **Frontend File:** [`frontend/components/chat/MessageBubble.tsx`](file:///c:/Users/Lenovo/Documents/psw/Chat-App/frontend/components/chat/MessageBubble.tsx)
+* **Backend Models:** [`backend/src/models/Message.ts`](file:///c:/Users/Lenovo/Documents/psw/Chat-App/backend/src/models/Message.ts)
+* **Status Lifecycle:**
+  1. **Pending (🕒 Spinner):** `message.isPending === true` jab tak socket/server se confirm nahi hota.
+  2. **Sent (✓ Single Tick):** Server par save hote hi `isPending: false` ho jata hai aur single white tick dikhai deti hai.
+  3. **Delivered (✓✓ Double Ticks):** Jab recipient client par packet deliver hota hai (`message.deliveredTo.length > 1`).
+  4. **Read (🔵✓✓ Double Blue Ticks):** Jab recipient conversation open karta hai to frontend `POST /api/chats/:chatId/read` aur socket `message:read` event emit karta hai. Sender ki screen par real-time bina reload kiye ticks luminous Cyan/Blue (`#38BDF8`) ban jati hain (`message.readBy.length > 1`).
+
+---
+
+#### 📌 Feature 6: Real-Time Typing Indicator
+
+* **Frontend Files:** [`MessageInput.tsx`](file:///c:/Users/Lenovo/Documents/psw/Chat-App/frontend/components/chat/MessageInput.tsx), [`page.tsx`](file:///c:/Users/Lenovo/Documents/psw/Chat-App/frontend/app/chat/page.tsx), [`ChatWindow.tsx`](file:///c:/Users/Lenovo/Documents/psw/Chat-App/frontend/components/chat/ChatWindow.tsx)
+* **Backend Socket:** [`backend/src/sockets/chat.socket.ts`](file:///c:/Users/Lenovo/Documents/psw/Chat-App/backend/src/sockets/chat.socket.ts)
+* **Debounce Execution:**
+  - Jab user key press karta hai, to `onTypingStart()` ke sath socket event `socket.emit("typing:start", { chatId })` chalta hai.
+  - `typingTimeoutRef` timer lagaya jata hai (2000 milliseconds).
+  - Agar user 2 second tak kuch na likhe ya message send kar de, to timer expire hokar `socket.emit("typing:stop", { chatId })` bhej deta hai.
+  - Recipient ki screen par bottom par pill display hoti hai:
+    > 🔵🔵🔵 *"Alice is typing..."* (3 animated bouncing dots ke sath).
+
+---
+
+#### 📌 Feature 7: Contacts List Screen & Real-Time Search
+
+* **Frontend Component:** [`frontend/components/chat/ContactsView.tsx`](file:///c:/Users/Lenovo/Documents/psw/Chat-App/frontend/components/chat/ContactsView.tsx)
+* **Backend Route:** [`backend/src/routes/users.routes.ts`](file:///c:/Users/Lenovo/Documents/psw/Chat-App/backend/src/routes/users.routes.ts)
+* **Backend Controller:** [`backend/src/controllers/user.controller.ts`](file:///c:/Users/Lenovo/Documents/psw/Chat-App/backend/src/controllers/user.controller.ts)
+* **Navigation Trigger:**
+  - Sab se left wali Navigation Rail mein jab user **Contacts (👥)** icon click karta hai, to `activeTab` "contacts" ban jata hai aur `ChatSidebar` ki jagah `ContactsView` mount hota hai.
+* **API Fetching:**
+  - Component mount hone par `api.get("/api/users")` call karta hai.
+  - Backend controller `searchUsers` MongoDB query chalata hai: `User.find({ _id: { $ne: currentUserId } })`. Logged-in user ke ilawa baqi sab registered users return hote hain.
+* **Instant Search Debounce:**
+  - Search input mein type karne par 250ms debounce ke sath `api.get("/api/users?search=" + query)` chalta hai.
+  - Backend query case-insensitive regex match karti hai:
+    ```typescript
+    filter.$or = [
+      { name: { $regex: query, $options: 'i' } },
+      { email: { $regex: query, $options: 'i' } }
+    ];
+    ```
+
+---
+
+#### 📌 Feature 8: 1-Click Start New Conversation Flow
+
+* **Frontend File:** [`frontend/components/chat/ContactsView.tsx`](file:///c:/Users/Lenovo/Documents/psw/Chat-App/frontend/components/chat/ContactsView.tsx)
+* **Backend Route:** [`backend/src/routes/chats.routes.ts`](file:///c:/Users/Lenovo/Documents/psw/Chat-App/backend/src/routes/chats.routes.ts) (`POST /api/chats`)
+* **Backend Controller:** [`backend/src/controllers/chat.controller.ts`](file:///c:/Users/Lenovo/Documents/psw/Chat-App/backend/src/controllers/chat.controller.ts) (`createOrGetDirectChat`)
+* **Flow:**
+  1. Contacts screen par kisi user ke aage **"Chat"** button dabaya jata hai.
+  2. Frontend call karta hai: `api.post("/api/chats", { userId })`.
+  3. Backend MongoDB mein check karta hai: Kya in dono users ke darmiyan pehle se 1-on-1 chat bani hui hai?
+     - Agar bani hui hai to wahi chat return kar deta hai.
+     - Agar nahi bani hui to `Chat.create({ type: 'direct', participantIds: [currentUserId, userId] })` se naya room banata hai.
+  4. Frontend response aane par:
+     - `onSelectChat(chatData)` call karta hai.
+     - `onSwitchToChats()` call karta hai jisse active view automatically **Chats** tab par switch ho jata hai aur window ready ho jati hai!
+
+---
+
+#### 📌 Feature 9: Message Deletion Flow (For Everyone & For Me)
+
+* **Frontend File:** [`frontend/components/chat/MessageBubble.tsx`](file:///c:/Users/Lenovo/Documents/psw/Chat-App/frontend/components/chat/MessageBubble.tsx) & [`page.tsx`](file:///c:/Users/Lenovo/Documents/psw/Chat-App/frontend/app/chat/page.tsx)
+* **Backend Route:** [`backend/src/routes/messages.routes.ts`](file:///c:/Users/Lenovo/Documents/psw/Chat-App/backend/src/routes/messages.routes.ts) (`DELETE /api/messages/:messageId`)
+* **Backend Controller:** [`backend/src/controllers/chat.controller.ts`](file:///c:/Users/Lenovo/Documents/psw/Chat-App/backend/src/controllers/chat.controller.ts) (`deleteMessage`)
+* **Execution:**
+  1. Message bubble par mouse le jane par 3-dots menu button reveal hota hai.
+  2. Click karne par dropdown menu khulta hai.
+  3. **"Delete for everyone":**
+     - Frontend `api.delete("/api/messages/" + messageId)` call karta hai.
+     - Backend check karta hai ke kya delete karne wala message ka original sender hai? Agar haan, to:
+       ```typescript
+       message.deletedAt = new Date();
+       message.text = 'This message was deleted';
+       await message.save();
+       ```
+     - Backend socket room `chat:${message.chatId}` mein `message:deleted` emit karta hai.
+     - Dono users ke clients par message content replace ho kar italic muted notification ban jata hai:
+       > *"🚫 This message was deleted"*
+  4. **"Delete for me":**
+     - Local React state se message filter out kar diya jata hai: `setMessages(prev => prev.filter(m => m._id !== messageId))`.
+
+---
+
+### 8.3 🗺️ Component-Wise Live Architecture Map (Quick Reference Table)
+
+```
+┌─────────────────────────────────┬────────────────────────────────────────────┬────────────────────────────────────────────────────────┐
+│ Frontend Component              │ Backend Route / Socket Event / DB          │ Kaam Aur Integration Ka Tareeqa                         │
+├─────────────────────────────────┼────────────────────────────────────────────┼────────────────────────────────────────────────────────┤
+│ 1. MessageInput.tsx             │ POST /api/upload (Multer + Storage)        │ Photos/Files upload karke metadata wapas leta hai.     │
+│ 2. MessageInput.tsx             │ emoji-picker-react (Dynamic Dark Popover)  │ Cursor par emoji insert karta hai.                     │
+│ 3. MessageInput.tsx             │ Socket: 'typing:start' & 'typing:stop'     │ 2-sec debounce ke sath live typing emit karta hai.     │
+│ 4. MessageBubble.tsx            │ Image Thumbnail + Fullscreen Lightbox      │ Pictures zoom modal aur document cards render karta hai│
+│ 5. MessageBubble.tsx            │ DELETE /api/messages/:messageId            │ Message soft delete karta hai (DB: deletedAt set).     │
+│ 6. MessageBubble.tsx            │ Socket: 'message:deleted'                  │ Live dono screens par "This message was deleted" karta │
+│ 7. ContactsView.tsx             │ GET /api/users                             │ MongoDB se sab registered contacts fetch karta hai.    │
+│ 8. ContactsView.tsx             │ GET /api/users?search=<query>              │ Real-time 250ms debounced user search karta hai.       │
+│ 9. ContactsView.tsx             │ POST /api/chats { userId }                 │ 1-Click direct chat initiate karke chat open karta hai.│
+│ 10. ChatWindow.tsx              │ Animated Typing Dots                       │ Doosre user ke type karne par 3-dots animation dikhata │
+│ 11. page.tsx                    │ MongoDB: `messages`, `attachments`, `chats`│ Tamam Socket events aur state synchronization controller│
+└─────────────────────────────────┴────────────────────────────────────────────┴────────────────────────────────────────────────────────┘
+```
+
+---
+
 ### 🚀 Complete System Status:
-* ✅ **Database:** MongoDB running on `27017` (Database: `chat_app`)
+* ✅ **Database:** MongoDB running on `27017` (Database: `chat_app` — Messages, Chats, Attachments & Users persisted)
 * ✅ **Backend Server:** Node/Express running on `http://localhost:5000`
 * ✅ **Frontend App:** Next.js running on `http://localhost:3000` / `3001`
 * ✅ **Day 1 Authentication:** Completed (Register, Login, JWT in localStorage)
 * ✅ **Day 2 Chat Core (Full-Stack Integrated):** Backend APIs + WebSockets + Frontend UI completely synchronized with 0 errors.
+* ✅ **Day 3 Advanced Chat Features (Full-Stack Integrated):**
+  - Real-Time Typing Indicator (debounced)
+  - Message Status Ticks (Sent ✓, Delivered ✓✓, Read 🔵✓✓)
+  - Emoji Picker (Dynamic dark popover)
+  - Image & Media Sharing (Multer + Preview + Lightbox Modal)
+  - Contacts Page & Instant User Search (`ContactsView.tsx`)
+  - Message Deletion (Soft delete for everyone & delete for me)
+  - MongoDB Persistent Attachments Storage (`attachments` collection)
+
+---
+
+### 🗺️ Full Architecture Summary Table (Day 3 Complete Overview):
+
+| # | Feature | Frontend Trigger / Component | Backend API / Socket Route | Database (MongoDB) Collection | Real-Time Synchronization Lifecycle |
+|:---:|---|---|---|---|---|
+| 1 | **Emoji Picker** | [`MessageInput.tsx`](file:///c:/Users/Lenovo/Documents/psw/Chat-App/frontend/components/chat/MessageInput.tsx) | Client-side State (`emoji-picker-react`) | — | Direct Input Cursor Injection |
+| 2 | **File & Image Upload** | [`MessageInput.tsx`](file:///c:/Users/Lenovo/Documents/psw/Chat-App/frontend/components/chat/MessageInput.tsx) | `POST /api/upload` (Multer + Storage) | Local `/uploads` / Cloudinary | Instant Thumbnail Preview Banner |
+| 3 | **Media Message Persistence** | [`page.tsx`](file:///c:/Users/Lenovo/Documents/psw/Chat-App/frontend/app/chat/page.tsx) | Socket: `message:send` | `messages` & `attachments` | Socket: `message:created` Broadcast |
+| 4 | **Media Lightbox Modal** | [`MessageBubble.tsx`](file:///c:/Users/Lenovo/Documents/psw/Chat-App/frontend/components/chat/MessageBubble.tsx) | Client-side State (`selectedImage`) | — | Full-Screen HD View Modal with close `X` |
+| 5 | **Status Ticks (Sent/Delivered/Read)** | [`MessageBubble.tsx`](file:///c:/Users/Lenovo/Documents/psw/Chat-App/frontend/components/chat/MessageBubble.tsx) | `POST /api/chats/:id/read` | `messages` (`readBy`, `deliveredTo`) | Socket: `message:read` (Cyan Blue Ticks) |
+| 6 | **Typing Indicator** | [`ChatWindow.tsx`](file:///c:/Users/Lenovo/Documents/psw/Chat-App/frontend/components/chat/ChatWindow.tsx) | Socket: `typing:start` / `typing:stop` | In-memory Socket Room | 2s Debounced 3-Dot Bouncing Animation |
+| 7 | **Contacts Screen** | [`ContactsView.tsx`](file:///c:/Users/Lenovo/Documents/psw/Chat-App/frontend/components/chat/ContactsView.tsx) | `GET /api/users` | `users` collection | Registered Users Cards + Green Online Badges |
+| 8 | **Instant User Search** | [`ContactsView.tsx`](file:///c:/Users/Lenovo/Documents/psw/Chat-App/frontend/components/chat/ContactsView.tsx) | `GET /api/users?search=<query>` | `users` (Regex Query) | 250ms Debounced Auto-Filtering |
+| 9 | **1-Click Start Chat** | [`ContactsView.tsx`](file:///c:/Users/Lenovo/Documents/psw/Chat-App/frontend/components/chat/ContactsView.tsx) | `POST /api/chats { userId }` | `chats` collection | Switch to Chat Window & Load Message History |
+| 10 | **Message Deletion** | [`MessageBubble.tsx`](file:///c:/Users/Lenovo/Documents/psw/Chat-App/frontend/components/chat/MessageBubble.tsx) | `DELETE /api/messages/:id` | `messages` (`deletedAt`) | Socket: `message:deleted` Live Text Replace |
+
+
+
 
 

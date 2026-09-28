@@ -37,6 +37,11 @@ app.get('/health', (_req: Request, res: Response) => {
   });
 });
 
+import path from 'path';
+
+// Static uploaded files serving
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', usersRoutes);
@@ -45,6 +50,7 @@ app.use('/api/messages', messagesRoutes);
 app.use('/api/groups', groupsRoutes);
 app.use('/api/calls', callsRoutes);
 app.use('/api/uploads', uploadsRoutes);
+app.use('/api/upload', uploadsRoutes);
 app.use('/api/settings', settingsRoutes);
 
 // Global Error Handler

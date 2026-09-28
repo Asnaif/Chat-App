@@ -28,6 +28,7 @@ export interface IMessage {
   isStarred?: boolean;
   deliveredTo?: string[];
   readBy?: string[];
+  deletedAt?: string | Date;
   createdAt: string;
   updatedAt?: string;
   tempId?: string;

@@ -171,7 +171,10 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
             const chatTitle = chat.title || otherUser?.name || "Direct Message";
             const avatarUrl = chat.avatarUrl || otherUser?.avatarUrl;
             const lastMsg = chat.lastMessageId;
-            const senderObj = typeof lastMsg?.senderId === "object" ? lastMsg.senderId as IUser : null;
+            const senderObj =
+              typeof lastMsg?.senderId === "object" && lastMsg.senderId !== null
+                ? (lastMsg.senderId as IUser)
+                : null;
 
             return (
               <div
