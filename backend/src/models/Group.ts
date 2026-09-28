@@ -37,5 +37,6 @@ const GroupSchema = new Schema<IGroup>(
 );
 
 GroupSchema.index({ createdBy: 1, updatedAt: -1 });
+GroupSchema.index({ 'members.userId': 1 });
 
 export const Group = mongoose.model<IGroup>('Group', GroupSchema);
