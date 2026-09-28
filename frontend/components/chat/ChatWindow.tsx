@@ -26,6 +26,7 @@ interface ChatWindowProps {
   onTypingStart: () => void;
   onTypingStop: () => void;
   onBack: () => void;
+  onStartCall?: (type: "audio" | "video") => void;
 }
 
 export const ChatWindow: React.FC<ChatWindowProps> = ({
@@ -41,6 +42,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   onTypingStart,
   onTypingStop,
   onBack,
+  onStartCall,
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -118,6 +120,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         currentUser={currentUser}
         isOnline={isOnline}
         onBack={onBack}
+        onStartCall={onStartCall}
       />
 
       {/* Messages Stream */}

@@ -105,3 +105,30 @@ export const getUploadSignature = async (req: Request, res: Response, next: Next
     next(error);
   }
 };
+
+export const uploadDirect = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    if (!req.file) {
+      throw new ApiError(400, 'No file uploaded', 'FILE_MISSING');
+    }
+
+    const host = req.get('host');
+    const protocol = req.protocol;
+    const fileUrl = `${protocol}://${host}/uploads/${req.file.filename}`;
+
+    sendSuccess({
+      res,
+      statusCode: 201,
+      message: 'File uploaded successfully',
+      data: {
+        storageUrl: fileUrl,
+        name: req.file.originalname,
+        mimeType: req.file.mimetype,
+        size: req.file.size,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+

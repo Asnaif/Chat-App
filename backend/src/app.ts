@@ -1,8 +1,11 @@
 import express, { Application, Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import path from 'path';
+import fs from 'fs';
 import { ENV } from './config/env';
 import { errorHandler } from './middleware/errorHandler';
+import { apiLimiter } from './middleware/rateLimit';
 import { sendSuccess } from './utils/apiResponse';
 
 // Routes imports
@@ -17,14 +20,21 @@ import settingsRoutes from './routes/settings.routes';
 
 const app: Application = express();
 
+// Ensure uploads directory exists
+const uploadsDir = path.join(__dirname, '../uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
 // Security and Base Middlewares
-app.use(helmet());
+app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(
   cors({
     origin: [ENV.CLIENT_URL, 'http://localhost:3000', 'http://localhost:3001'],
     credentials: true,
   })
 );
+app.use('/uploads', express.static(uploadsDir));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
@@ -41,6 +51,8 @@ import path from 'path';
 
 // Static uploaded files serving
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+// API Rate Limiting
+app.use('/api', apiLimiter);
 
 // API Routes
 app.use('/api/auth', authRoutes);
