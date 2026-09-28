@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import { User } from '../models/User';
+import { Session } from '../models/Session';
 import { signToken } from '../utils/jwt';
 import { sendSuccess } from '../utils/apiResponse';
 import { ApiError } from '../utils/apiError';
@@ -28,7 +30,22 @@ export const register = async (req: Request, res: Response, next: NextFunction):
       status: 'offline',
     });
 
-    const token = signToken({ userId: newUser._id.toString(), email: newUser.email });
+    const sessionId = crypto.randomUUID();
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    await Session.create({
+      userId: newUser._id,
+      sessionId,
+      userAgent: (req.headers['user-agent'] as string) || 'Web Browser',
+      ip: (req.ip || req.socket.remoteAddress || '127.0.0.1') as string,
+      expiresAt,
+    });
+
+    const token = signToken({
+      userId: newUser._id.toString(),
+      email: newUser.email,
+      sessionId,
+    });
 
     sendSuccess({
       res,
@@ -45,6 +62,7 @@ export const register = async (req: Request, res: Response, next: NextFunction):
           createdAt: newUser.createdAt,
         },
         token,
+        sessionId,
       },
     });
   } catch (error) {
@@ -70,7 +88,22 @@ export const login = async (req: Request, res: Response, next: NextFunction): Pr
       throw new ApiError(401, 'Invalid email or password', 'AUTH_INVALID_CREDENTIALS');
     }
 
-    const token = signToken({ userId: user._id.toString(), email: user.email });
+    const sessionId = crypto.randomUUID();
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    await Session.create({
+      userId: user._id,
+      sessionId,
+      userAgent: (req.headers['user-agent'] as string) || 'Web Browser',
+      ip: (req.ip || req.socket.remoteAddress || '127.0.0.1') as string,
+      expiresAt,
+    });
+
+    const token = signToken({
+      userId: user._id.toString(),
+      email: user.email,
+      sessionId,
+    });
 
     sendSuccess({
       res,
@@ -87,6 +120,7 @@ export const login = async (req: Request, res: Response, next: NextFunction): Pr
           createdAt: user.createdAt,
         },
         token,
+        sessionId,
       },
     });
   } catch (error) {
@@ -94,8 +128,15 @@ export const login = async (req: Request, res: Response, next: NextFunction): Pr
   }
 };
 
-export const logout = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
+export const logout = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
+    if (req.user?.sessionId) {
+      await Session.findOneAndUpdate(
+        { sessionId: req.user.sessionId },
+        { revokedAt: new Date() }
+      );
+    }
+
     sendSuccess({
       res,
       message: 'Logged out successfully',
@@ -105,3 +146,4 @@ export const logout = async (_req: Request, res: Response, next: NextFunction): 
     next(error);
   }
 };
+

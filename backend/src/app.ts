@@ -5,6 +5,7 @@ import path from 'path';
 import fs from 'fs';
 import { ENV } from './config/env';
 import { errorHandler } from './middleware/errorHandler';
+import { apiLimiter } from './middleware/rateLimit';
 import { sendSuccess } from './utils/apiResponse';
 
 // Routes imports
@@ -45,6 +46,9 @@ app.get('/health', (_req: Request, res: Response) => {
     data: { status: 'UP', timestamp: new Date().toISOString() },
   });
 });
+
+// API Rate Limiting
+app.use('/api', apiLimiter);
 
 // API Routes
 app.use('/api/auth', authRoutes);
