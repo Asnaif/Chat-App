@@ -36,4 +36,22 @@ api.interceptors.response.use(
   }
 );
 
+export const uploadFile = async (file: File): Promise<{
+  storageUrl: string;
+  name: string;
+  mimeType: string;
+  size: number;
+}> => {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const res = await api.post('/api/uploads/file', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+
+  return res.data?.data || res.data;
+};
+
 export default api;
