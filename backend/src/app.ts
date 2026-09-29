@@ -20,10 +20,19 @@ import settingsRoutes from './routes/settings.routes';
 
 const app: Application = express();
 
+import os from 'os';
+
 // Ensure uploads directory exists
-const uploadsDir = path.join(__dirname, '../uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
+const uploadsDir = process.env.NODE_ENV === 'production'
+  ? path.join(os.tmpdir(), 'uploads')
+  : path.join(__dirname, '../uploads');
+
+try {
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+} catch {
+  // Ignore permission issue
 }
 
 // Security and Base Middlewares
@@ -53,10 +62,9 @@ app.get('/health', (_req: Request, res: Response) => {
   });
 });
 
-// Static uploaded files serving
-app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 // API Rate Limiting
 app.use('/api', apiLimiter);
+
 
 // API Routes
 app.use('/api/auth', authRoutes);

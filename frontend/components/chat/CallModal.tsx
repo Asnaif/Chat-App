@@ -33,6 +33,8 @@ const ICE_SERVERS: RTCConfiguration = {
   iceServers: [
     { urls: "stun:stun.l.google.com:19302" },
     { urls: "stun:stun1.l.google.com:19302" },
+    { urls: "stun:stun2.l.google.com:19302" },
+    { urls: "stun:stun.services.mozilla.com" },
   ],
 };
 
@@ -54,6 +56,8 @@ export const CallModal: React.FC<CallModalProps> = ({
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteAudioRef = useRef<HTMLAudioElement>(null);
+  const iceCandidateQueueRef = useRef<RTCIceCandidateInit[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Teardown streams and connection
@@ -73,6 +77,7 @@ export const CallModal: React.FC<CallModalProps> = ({
       pcRef.current = null;
     }
 
+    iceCandidateQueueRef.current = [];
     setCallDuration(0);
     onCloseCall();
   }, [onCloseCall]);
@@ -111,11 +116,22 @@ export const CallModal: React.FC<CallModalProps> = ({
       if (remoteVideoRef.current) {
         remoteVideoRef.current.srcObject = remoteStream;
       }
+      if (remoteAudioRef.current) {
+        remoteAudioRef.current.srcObject = remoteStream;
+        remoteAudioRef.current.play().catch(() => {});
+      }
 
       pc.ontrack = (event) => {
         event.streams[0].getTracks().forEach((track) => {
           remoteStream.addTrack(track);
         });
+        if (remoteVideoRef.current) {
+          remoteVideoRef.current.srcObject = remoteStream;
+        }
+        if (remoteAudioRef.current) {
+          remoteAudioRef.current.srcObject = remoteStream;
+          remoteAudioRef.current.play().catch(() => {});
+        }
       };
 
       // Exchange ICE Candidates
@@ -129,6 +145,7 @@ export const CallModal: React.FC<CallModalProps> = ({
           });
         }
       };
+
 
       // Get Local Audio/Video Stream
       const isVideo = activeCall?.type === "video";
@@ -165,6 +182,19 @@ export const CallModal: React.FC<CallModalProps> = ({
 
     try {
       await pc.setRemoteDescription(new RTCSessionDescription(activeCall.sdpOffer));
+
+      // Drain any queued ICE candidates received before answer
+      while (iceCandidateQueueRef.current.length > 0) {
+        const candidate = iceCandidateQueueRef.current.shift();
+        if (candidate) {
+          try {
+            await pc.addIceCandidate(new RTCIceCandidate(candidate));
+          } catch (e) {
+            console.warn("Failed to apply queued ICE candidate:", e);
+          }
+        }
+      }
+
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
 
@@ -231,6 +261,19 @@ export const CallModal: React.FC<CallModalProps> = ({
       if (pcRef.current) {
         try {
           await pcRef.current.setRemoteDescription(new RTCSessionDescription(data.sdp));
+
+          // Drain any queued ICE candidates received before remote description was set
+          while (iceCandidateQueueRef.current.length > 0) {
+            const candidate = iceCandidateQueueRef.current.shift();
+            if (candidate && pcRef.current) {
+              try {
+                await pcRef.current.addIceCandidate(new RTCIceCandidate(candidate));
+              } catch (e) {
+                console.warn("Failed to apply queued ICE candidate:", e);
+              }
+            }
+          }
+
           setCallState("connected");
           timerRef.current = setInterval(() => {
             setCallDuration((prev) => prev + 1);
@@ -242,14 +285,20 @@ export const CallModal: React.FC<CallModalProps> = ({
     };
 
     const handleIceCandidate = async (data: { candidate: RTCIceCandidateInit }) => {
-      if (pcRef.current && data.candidate) {
+      if (!data.candidate) return;
+
+      if (pcRef.current && pcRef.current.remoteDescription) {
         try {
           await pcRef.current.addIceCandidate(new RTCIceCandidate(data.candidate));
         } catch (err) {
           console.error("Error adding ICE candidate:", err);
         }
+      } else {
+        // Remote description is not set yet; buffer candidate to prevent InvalidStateError
+        iceCandidateQueueRef.current.push(data.candidate);
       }
     };
+
 
     const handleCallRejected = () => {
       toast("Call declined", { icon: "🚫" });
@@ -359,8 +408,12 @@ export const CallModal: React.FC<CallModalProps> = ({
       ) : (
         /* 2. Active or Dialing Call Screen View */
         <div className="w-full max-w-4xl h-[85vh] bg-[#161B26] border border-[#242C3F] rounded-3xl overflow-hidden flex flex-col relative shadow-2xl">
+          {/* Always active audio output element */}
+          <audio ref={remoteAudioRef} autoPlay playsInline className="hidden" />
+
           {/* Main Video or Audio Screen */}
           <div className="flex-1 relative flex items-center justify-center bg-black/40 overflow-hidden">
+
             {activeCall.type === "video" && callState === "connected" ? (
               <>
                 {/* Remote Participant Video Stream */}

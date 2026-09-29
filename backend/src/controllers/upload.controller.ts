@@ -7,10 +7,19 @@ import { ENV } from '../config/env';
 import { sendSuccess } from '../utils/apiResponse';
 import { ApiError } from '../utils/apiError';
 
+import os from 'os';
+
 // Ensure local uploads directory exists as reliable fallback
-const uploadDir = path.join(process.cwd(), 'uploads');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
+const uploadDir = process.env.NODE_ENV === 'production'
+  ? path.join(os.tmpdir(), 'uploads')
+  : path.join(process.cwd(), 'uploads');
+
+try {
+  if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+  }
+} catch {
+  // Ignore if folder creation has permission restrictions
 }
 
 // Memory storage for direct buffer stream to Cloudinary or disk
@@ -53,16 +62,18 @@ export const uploadFile = async (req: Request, res: Response, next: NextFunction
       storageUrl = result.secure_url || result.url;
       publicId = result.public_id;
     } else {
-      // Fallback: save to local backend uploads directory
+      // Fallback: save to local backend uploads directory (/tmp on cloud)
       const ext = path.extname(file.originalname) || '';
       const uniqueFileName = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}${ext}`;
       const filePath = path.join(uploadDir, uniqueFileName);
       fs.writeFileSync(filePath, file.buffer);
 
-      const serverUrl = `http://localhost:${ENV.PORT || 5000}`;
-      storageUrl = `${serverUrl}/uploads/${uniqueFileName}`;
+      const host = req.get('host');
+      const protocol = req.protocol || 'https';
+      storageUrl = `${protocol}://${host}/uploads/${uniqueFileName}`;
       publicId = uniqueFileName;
     }
+
 
     sendSuccess({
       res,
