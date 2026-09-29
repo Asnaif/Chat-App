@@ -34,7 +34,23 @@ const ICE_SERVERS: RTCConfiguration = {
     { urls: "stun:stun.l.google.com:19302" },
     { urls: "stun:stun1.l.google.com:19302" },
     { urls: "stun:stun2.l.google.com:19302" },
+    { urls: "stun:stun3.l.google.com:19302" },
     { urls: "stun:stun.services.mozilla.com" },
+    {
+      urls: "turn:openrelay.metered.ca:80",
+      username: "openrelayproject",
+      credential: "openrelayproject",
+    },
+    {
+      urls: "turn:openrelay.metered.ca:443",
+      username: "openrelayproject",
+      credential: "openrelayproject",
+    },
+    {
+      urls: "turn:openrelay.metered.ca:443?transport=tcp",
+      username: "openrelayproject",
+      credential: "openrelayproject",
+    },
   ],
 };
 
@@ -113,24 +129,22 @@ export const CallModal: React.FC<CallModalProps> = ({
       // Remote stream
       const remoteStream = new MediaStream();
       remoteStreamRef.current = remoteStream;
-      if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = remoteStream;
-      }
-      if (remoteAudioRef.current) {
-        remoteAudioRef.current.srcObject = remoteStream;
-        remoteAudioRef.current.play().catch(() => {});
-      }
 
       pc.ontrack = (event) => {
-        event.streams[0].getTracks().forEach((track) => {
-          remoteStream.addTrack(track);
-        });
+        const stream = (event.streams && event.streams[0]) ? event.streams[0] : remoteStream;
+        if (!event.streams || !event.streams[0]) {
+          stream.addTrack(event.track);
+        }
+        remoteStreamRef.current = stream;
+
         if (remoteVideoRef.current) {
-          remoteVideoRef.current.srcObject = remoteStream;
+          remoteVideoRef.current.srcObject = stream;
         }
         if (remoteAudioRef.current) {
-          remoteAudioRef.current.srcObject = remoteStream;
-          remoteAudioRef.current.play().catch(() => {});
+          remoteAudioRef.current.srcObject = stream;
+          remoteAudioRef.current.play().catch((err) => {
+            console.warn("Audio autoplay prevented by browser:", err);
+          });
         }
       };
 
@@ -146,11 +160,14 @@ export const CallModal: React.FC<CallModalProps> = ({
         }
       };
 
-
       // Get Local Audio/Video Stream
       const isVideo = activeCall?.type === "video";
       const localStream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
         video: isVideo ? { width: 1280, height: 720 } : false,
       });
 
@@ -158,6 +175,7 @@ export const CallModal: React.FC<CallModalProps> = ({
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = localStream;
       }
+
 
       localStream.getTracks().forEach((track) => {
         pc.addTrack(track, localStream);
@@ -408,8 +426,14 @@ export const CallModal: React.FC<CallModalProps> = ({
       ) : (
         /* 2. Active or Dialing Call Screen View */
         <div className="w-full max-w-4xl h-[85vh] bg-[#161B26] border border-[#242C3F] rounded-3xl overflow-hidden flex flex-col relative shadow-2xl">
-          {/* Always active audio output element */}
-          <audio ref={remoteAudioRef} autoPlay playsInline className="hidden" />
+          {/* Always active audio output element (off-screen so browser never suspends playback) */}
+          <audio
+            ref={remoteAudioRef}
+            autoPlay
+            playsInline
+            style={{ position: 'fixed', top: -9999, left: -9999, opacity: 0, pointerEvents: 'none' }}
+          />
+
 
           {/* Main Video or Audio Screen */}
           <div className="flex-1 relative flex items-center justify-center bg-black/40 overflow-hidden">

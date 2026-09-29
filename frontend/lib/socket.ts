@@ -10,11 +10,12 @@ export const getSocket = (): Socket => {
       auth: {
         token: token,
       },
-      transports: ['websocket', 'polling'],
+      transports: ['polling', 'websocket'],
       autoConnect: true,
       reconnection: true,
-      reconnectionAttempts: 10,
+      reconnectionAttempts: 20,
       reconnectionDelay: 1000,
+      timeout: 20000,
     });
 
     socket.on('connect', () => {
@@ -22,14 +23,27 @@ export const getSocket = (): Socket => {
     });
 
     socket.on('connect_error', (err) => {
-      console.warn('⚠️ Socket connection warning:', err.message);
+      if (err.message !== 'websocket error') {
+        console.warn('⚠️ Socket connection warning:', err.message);
+      }
     });
-  } else if (!socket.connected) {
-    if (token) {
+  } else {
+    // Keep socket auth synchronized with current storage token
+    const currentAuth = typeof socket.auth === 'object' && socket.auth !== null ? (socket.auth as Record<string, unknown>) : undefined;
+    if (token && currentAuth?.token !== token) {
+
       socket.auth = { token };
+      if (socket.connected) {
+        socket.disconnect().connect();
+      } else {
+        socket.connect();
+      }
+    } else if (!socket.connected) {
+      socket.connect();
     }
-    socket.connect();
   }
+
+
 
   return socket;
 };
