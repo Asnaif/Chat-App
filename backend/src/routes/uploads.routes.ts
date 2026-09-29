@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import path from 'path';
-import { getUploadSignature, uploadDirect } from '../controllers/upload.controller';
+import { getUploadSignature, uploadDirect, uploadMiddleware, uploadFile } from '../controllers/upload.controller';
 import { authenticate } from '../middleware/auth';
 
 const router = Router();
@@ -25,6 +25,7 @@ const upload = multer({
 
 router.use(authenticate);
 
+router.post('/', uploadMiddleware.single('file'), uploadFile);
 router.post('/sign', getUploadSignature);
 router.post('/file', upload.single('file'), uploadDirect);
 router.post('/', upload.single('file'), uploadDirect);

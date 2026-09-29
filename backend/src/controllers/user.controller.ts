@@ -50,12 +50,12 @@ export const updateMe = async (req: Request, res: Response, next: NextFunction):
 
 export const searchUsers = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const query = req.query.search as string;
+    const query = ((req.query.search || req.query.q) as string)?.trim();
     const currentUserId = req.user?.userId;
 
     let filter: any = { _id: { $ne: currentUserId } };
 
-    if (query && query.trim().length > 0) {
+    if (query && query.length > 0) {
       filter.$or = [
         { name: { $regex: query, $options: 'i' } },
         { email: { $regex: query, $options: 'i' } },

@@ -19,9 +19,10 @@ interface ChatWindowProps {
   typingUserName?: string;
   onSendMessage: (
     text: string,
-    type?: "text" | "image" | "video" | "audio" | "document",
-    attachments?: IAttachment[]
+    attachments?: IAttachment[],
+    type?: "text" | "image" | "video" | "audio" | "document"
   ) => void;
+  onDeleteMessage?: (messageId: string, forEveryone: boolean) => void;
   onTypingStart: () => void;
   onTypingStop: () => void;
   onBack: () => void;
@@ -39,6 +40,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   isTyping,
   typingUserName,
   onSendMessage,
+  onDeleteMessage,
   onTypingStart,
   onTypingStop,
   onBack,
@@ -108,6 +110,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
               isSelf={isSelf}
               isGroup={chat.type === "group"}
               onUserClick={onOpenUserProfile}
+              onDeleteMessage={onDeleteMessage}
             />
           );
         })}

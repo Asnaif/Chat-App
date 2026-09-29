@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { MessageSquare, Users, Phone, Settings, LogOut } from "lucide-react";
+import { MessageSquare, Users, Phone, Settings, LogOut, UserPlus } from "lucide-react";
 import { User } from "@/context/AuthContext";
 
 interface NavigationRailProps {
@@ -72,6 +72,16 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
               </button>
             );
           })}
+
+          {/* Quick New Chat Button */}
+          <button
+            type="button"
+            onClick={onOpenNewChat}
+            className="w-12 h-12 rounded-2xl flex items-center justify-center text-text-secondary hover:text-white hover:bg-[#232A3B] transition-all border border-dashed border-[#2F374A] hover:border-primary/50 mt-1"
+            title="Start New Chat"
+          >
+            <UserPlus className="w-5 h-5" />
+          </button>
         </nav>
       </div>
 

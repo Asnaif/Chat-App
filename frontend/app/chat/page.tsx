@@ -8,6 +8,7 @@ import { getSocket } from "@/lib/socket";
 import { IChat, IMessage, IAttachment, IUser } from "@/types/chat";
 import { NavigationRail } from "@/components/chat/NavigationRail";
 import { ChatSidebar } from "@/components/chat/ChatSidebar";
+import { ContactsView } from "@/components/chat/ContactsView";
 import { ChatWindow } from "@/components/chat/ChatWindow";
 import { EmptyChatState } from "@/components/chat/EmptyChatState";
 import { NewChatModal } from "@/components/chat/NewChatModal";
@@ -240,6 +241,29 @@ export default function ChatDashboardPage() {
       }
     };
 
+    // Listen to deleted messages
+    const handleMessageDeleted = ({
+      messageId,
+      chatId,
+    }: {
+      messageId: string;
+      chatId: string;
+    }) => {
+      const currentActive = activeChatRef.current;
+      if (currentActive && currentActive._id === chatId) {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m._id === messageId
+              ? {
+                  ...m,
+                  deletedAt: new Date().toISOString(),
+                  text: "This message was deleted",
+                  attachments: [],
+                }
+              : m
+          )
+        );
+      }
     // Listen to incoming call
     const handleCallIncoming = ({
       callId,
@@ -279,6 +303,7 @@ export default function ChatDashboardPage() {
     socket.on("typing:stop", handleTypingStop);
     socket.on("message:read", handleMessageRead);
     socket.on("message:updated", handleMessageUpdated);
+    socket.on("message:deleted", handleMessageDeleted);
     socket.on("call:incoming", handleCallIncoming);
     socket.on("group:created", handleGroupCreatedEvent);
 
@@ -290,6 +315,7 @@ export default function ChatDashboardPage() {
       socket.off("typing:stop", handleTypingStop);
       socket.off("message:read", handleMessageRead);
       socket.off("message:updated", handleMessageUpdated);
+      socket.off("message:deleted", handleMessageDeleted);
       socket.off("call:incoming", handleCallIncoming);
       socket.off("group:created", handleGroupCreatedEvent);
     };
@@ -342,8 +368,8 @@ export default function ChatDashboardPage() {
   // Send Message Handler (Optimistic + Socket + API fallback)
   const handleSendMessage = async (
     text: string,
-    type: "text" | "image" | "video" | "audio" | "document" = "text",
-    attachments?: IAttachment[]
+    attachments: IAttachment[] = [],
+    type: "text" | "image" | "video" | "audio" | "document" = "text"
   ) => {
     if (!activeChat || !user) return;
 
@@ -411,6 +437,38 @@ export default function ChatDashboardPage() {
         toast.error("Failed to send message");
         setMessages((prev) => prev.filter((m) => m.tempId !== tempId));
       }
+    }
+  };
+
+  // Message Delete Handler (Soft delete + Socket notify / local remove)
+  const handleDeleteMessage = async (messageId: string, forEveryone: boolean) => {
+    try {
+      if (forEveryone) {
+        await api.delete(`/api/messages/${messageId}`);
+        setMessages((prev) =>
+          prev.map((m) =>
+            m._id === messageId
+              ? {
+                  ...m,
+                  deletedAt: new Date().toISOString(),
+                  text: "This message was deleted",
+                  attachments: [],
+                }
+              : m
+          )
+        );
+        toast.success("Message deleted for everyone");
+      } else {
+        // Delete for me (local removal)
+        setMessages((prev) => prev.filter((m) => m._id !== messageId));
+        toast.success("Message deleted for you");
+      }
+    } catch (err: unknown) {
+      console.error("Delete message error:", err);
+      const errMsg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        "Failed to delete message";
+      toast.error(errMsg);
     }
   };
 
@@ -508,6 +566,21 @@ export default function ChatDashboardPage() {
         />
       </div>
 
+      {/* 2. Conversations Sidebar or Contacts List */}
+      <div className={`${activeChat ? "hidden md:flex" : "flex"} flex-1 md:flex-initial h-full`}>
+        {activeTab === "contacts" ? (
+          <ContactsView
+            onlineUserIds={Array.from(onlineUserIds)}
+            onSelectChat={(chat) => {
+              setChats((prev) => {
+                if (prev.some((c) => c._id === chat._id)) return prev;
+                return [chat, ...prev];
+              });
+              setActiveChat(chat);
+            }}
+            onSwitchToChats={() => setActiveTab("chats")}
+          />
+        ) : (
       {/* 2. Conversations Sidebar (Hidden on mobile if a chat is actively selected, or when in calls tab) */}
       {activeTab !== "calls" && (
         <div className={`${activeChat ? "hidden md:flex" : "flex"} flex-1 md:flex-initial h-full`}>
@@ -538,6 +611,7 @@ export default function ChatDashboardPage() {
             isTyping={isTyping}
             typingUserName={typingUserName}
             onSendMessage={handleSendMessage}
+            onDeleteMessage={handleDeleteMessage}
             onTypingStart={handleTypingStart}
             onTypingStop={handleTypingStop}
             onBack={() => setActiveChat(null)}
