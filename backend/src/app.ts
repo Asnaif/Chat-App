@@ -30,10 +30,16 @@ if (!fs.existsSync(uploadsDir)) {
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(
   cors({
-    origin: [ENV.CLIENT_URL, 'http://localhost:3000', 'http://localhost:3001'],
+    origin: (_origin, callback) => {
+      // Dynamically allow any origin (e.g. Vercel deployments, localhost, mobile)
+      callback(null, true);
+    },
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
   })
 );
+
 app.use('/uploads', express.static(uploadsDir));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
