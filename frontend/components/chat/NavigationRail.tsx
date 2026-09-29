@@ -10,6 +10,7 @@ interface NavigationRailProps {
   setActiveTab: (tab: "chats" | "contacts" | "calls" | "settings") => void;
   onLogout: () => void;
   onOpenNewChat: () => void;
+  onOpenProfile?: () => void;
 }
 
 export const NavigationRail: React.FC<NavigationRailProps> = ({
@@ -18,6 +19,7 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
   setActiveTab,
   onLogout,
   onOpenNewChat,
+  onOpenProfile,
 }) => {
   const navItems = [
     { id: "chats" as const, label: "Chats", icon: MessageSquare },
@@ -49,6 +51,9 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
                 onClick={() => {
                   if (item.id === "contacts") {
                     onOpenNewChat();
+                  } else if (item.id === "settings") {
+                    if (onOpenProfile) onOpenProfile();
+                    else setActiveTab(item.id);
                   } else {
                     setActiveTab(item.id);
                   }
@@ -73,8 +78,12 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
       {/* Bottom Profile & Logout */}
       <div className="flex flex-col items-center gap-4">
         {/* User Avatar */}
-        <div className="relative group cursor-pointer" title={user?.fullName || "Profile"}>
-          <div className="w-11 h-11 rounded-full bg-[#232A3B] border-2 border-primary/40 flex items-center justify-center overflow-hidden">
+        <div
+          onClick={onOpenProfile}
+          className="relative group cursor-pointer"
+          title={user?.fullName ? `${user.fullName} (Click to edit profile)` : "Profile"}
+        >
+          <div className="w-11 h-11 rounded-full bg-[#232A3B] border-2 border-primary/40 group-hover:border-primary flex items-center justify-center overflow-hidden transition-colors">
             {user?.profilePhoto ? (
               /* eslint-disable-next-line @next/next/no-img-element */
               <img

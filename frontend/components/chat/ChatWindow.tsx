@@ -26,6 +26,8 @@ interface ChatWindowProps {
   onTypingStop: () => void;
   onBack: () => void;
   onStartCall?: (type: "audio" | "video") => void;
+  onOpenGroupInfo?: () => void;
+  onOpenUserProfile?: (userId: string) => void;
 }
 
 export const ChatWindow: React.FC<ChatWindowProps> = ({
@@ -41,6 +43,8 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   onTypingStop,
   onBack,
   onStartCall,
+  onOpenGroupInfo,
+  onOpenUserProfile,
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -90,16 +94,20 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         {/* Message bubbles */}
         {groupMessages.map((msg) => {
           const senderIdStr =
-            typeof msg.senderId === "object"
-              ? (msg.senderId as IUser)._id
-              : (msg.senderId as string);
-          const isSelf = senderIdStr === currentUser?._id;
+            typeof msg.senderId === "object" && msg.senderId !== null
+              ? (msg.senderId as IUser)?._id || ""
+              : typeof msg.senderId === "string"
+              ? msg.senderId
+              : "";
+          const isSelf = Boolean(senderIdStr && currentUser?._id && senderIdStr === currentUser._id);
 
           return (
             <MessageBubble
               key={msg._id || msg.tempId || Math.random().toString()}
               message={msg}
               isSelf={isSelf}
+              isGroup={chat.type === "group"}
+              onUserClick={onOpenUserProfile}
             />
           );
         })}
@@ -116,6 +124,8 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         isOnline={isOnline}
         onBack={onBack}
         onStartCall={onStartCall}
+        onOpenGroupInfo={onOpenGroupInfo}
+        onOpenUserProfile={onOpenUserProfile}
       />
 
       {/* Messages Stream */}

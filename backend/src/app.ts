@@ -54,6 +54,7 @@ app.use('/api/messages', messagesRoutes);
 app.use('/api/groups', groupsRoutes);
 app.use('/api/calls', callsRoutes);
 app.use('/api/uploads', uploadsRoutes);
+app.use('/api/upload', uploadsRoutes);
 app.use('/api/settings', settingsRoutes);
 
 // Global Error Handler

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Search, Plus, MessageSquare, CheckCheck } from "lucide-react";
+import { Search, Plus, MessageSquare, CheckCheck, Users } from "lucide-react";
 import { IChat, IUser } from "@/types/chat";
 import { User } from "@/context/AuthContext";
 import { format, isToday, isYesterday } from "date-fns";
@@ -13,6 +13,7 @@ interface ChatSidebarProps {
   onlineUserIds: Set<string>;
   onSelectChat: (chat: IChat) => void;
   onOpenNewChat: () => void;
+  onOpenCreateGroup?: () => void;
   loading: boolean;
 }
 
@@ -23,10 +24,11 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
   onlineUserIds,
   onSelectChat,
   onOpenNewChat,
+  onOpenCreateGroup,
   loading,
 }) => {
   const [searchTerm, setSearchTerm] = useState("");
-  const [activeFilter, setActiveFilter] = useState<"all" | "unread" | "direct">("all");
+  const [activeFilter, setActiveFilter] = useState<"all" | "unread" | "direct" | "groups">("all");
 
   // Helper to extract other participant in 1:1 chat
   const getOtherParticipant = (chat: IChat): IUser | undefined => {
@@ -58,6 +60,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
     if (!matchesSearch) return false;
     if (activeFilter === "unread") return (chat.unreadCount || 0) > 0;
     if (activeFilter === "direct") return chat.type === "direct";
+    if (activeFilter === "groups") return chat.type === "group";
     return true;
   });
 
@@ -73,13 +76,24 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
             </span>
           </div>
 
-          <button
-            onClick={onOpenNewChat}
-            className="w-9 h-9 rounded-xl bg-primary hover:bg-primary-hover text-white flex items-center justify-center shadow-glow transition-all active:scale-95"
-            title="Start New Chat"
-          >
-            <Plus className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-1.5">
+            {onOpenCreateGroup && (
+              <button
+                onClick={onOpenCreateGroup}
+                className="w-9 h-9 rounded-xl bg-[#232A3B] hover:bg-primary/20 hover:text-primary text-text-secondary flex items-center justify-center border border-[#2F374A] transition-all active:scale-95"
+                title="New Group"
+              >
+                <Users className="w-4 h-4" />
+              </button>
+            )}
+            <button
+              onClick={onOpenNewChat}
+              className="w-9 h-9 rounded-xl bg-primary hover:bg-primary-hover text-white flex items-center justify-center shadow-glow transition-all active:scale-95"
+              title="Start New Chat"
+            >
+              <Plus className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Search input */}
@@ -126,6 +140,16 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
           >
             Direct
           </button>
+          <button
+            onClick={() => setActiveFilter("groups")}
+            className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
+              activeFilter === "groups"
+                ? "bg-primary text-white"
+                : "text-text-secondary hover:text-white hover:bg-[#232A3B]"
+            }`}
+          >
+            Groups
+          </button>
         </div>
       </div>
 
@@ -168,10 +192,14 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
             const otherUser = getOtherParticipant(chat);
             const isOnline = otherUser ? onlineUserIds.has(otherUser._id) || otherUser.status === "online" : false;
             const isSelected = activeChat?._id === chat._id;
-            const chatTitle = chat.title || otherUser?.name || "Direct Message";
+            const isGroup = chat.type === "group";
+            const chatTitle = chat.title || otherUser?.name || (isGroup ? "Group Chat" : "Direct Message");
             const avatarUrl = chat.avatarUrl || otherUser?.avatarUrl;
             const lastMsg = chat.lastMessageId;
-            const senderObj = typeof lastMsg?.senderId === "object" ? lastMsg.senderId as IUser : null;
+            const senderObj =
+              typeof lastMsg?.senderId === "object" && lastMsg.senderId !== null
+                ? (lastMsg.senderId as IUser)
+                : null;
 
             return (
               <div
@@ -193,11 +221,13 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
                         alt={chatTitle}
                         className="w-full h-full object-cover"
                       />
+                    ) : isGroup ? (
+                      <Users className="w-5 h-5 text-primary" />
                     ) : (
                       chatTitle.charAt(0).toUpperCase()
                     )}
                   </div>
-                  {isOnline && (
+                  {!isGroup && isOnline && (
                     <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-accent-green rounded-full border-2 border-[#1B202D]" />
                   )}
                 </div>
