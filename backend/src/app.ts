@@ -47,8 +47,6 @@ app.get('/health', (_req: Request, res: Response) => {
   });
 });
 
-import path from 'path';
-
 // Static uploaded files serving
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 // API Rate Limiting

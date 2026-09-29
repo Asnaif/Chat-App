@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import path from 'path';
-import { getUploadSignature, uploadDirect } from '../controllers/upload.controller';
+import { getUploadSignature, uploadDirect, uploadMiddleware, uploadFile } from '../controllers/upload.controller';
 import { authenticate } from '../middleware/auth';
 
 const router = Router();
