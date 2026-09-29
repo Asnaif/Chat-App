@@ -20,24 +20,30 @@ export const registerCallHandlers = (io: Server, socket: Socket): void => {
       callerInfo?: { name: string; avatarUrl?: string };
     }) => {
       try {
-        let activeCall;
+        let resolvedCallId = callId;
         if (!callId) {
-          activeCall = await Call.create({
+          const activeCall = await Call.create({
             callerId: userId,
             receiverId: toUserId,
             type: mediaType,
             status: 'dialing',
           });
+          resolvedCallId = activeCall._id.toString();
+
+          // Send the callId back to the caller so they can reference it in future events
+          socket.emit('call:created', { callId: resolvedCallId });
         }
 
         io.to(`user:${toUserId}`).emit('call:incoming', {
-          callId: callId || activeCall?._id,
+          callId: resolvedCallId,
           callerId: userId,
           callerName: callerInfo?.name || 'Incoming Caller',
           callerAvatar: callerInfo?.avatarUrl,
           sdp,
           mediaType,
         });
+
+        console.log(`[Socket] Call offer relayed: ${resolvedCallId} from ${userId} to ${toUserId}`);
       } catch (err) {
         console.error('[Socket call:offer Error]:', err);
       }
@@ -58,6 +64,8 @@ export const registerCallHandlers = (io: Server, socket: Socket): void => {
           fromUserId: userId,
           sdp,
         });
+
+        console.log(`[Socket] Call answered: ${callId} by ${userId}, relayed to ${toUserId}`);
       } catch (err) {
         console.error('[Socket call:answer Error]:', err);
       }
@@ -72,6 +80,8 @@ export const registerCallHandlers = (io: Server, socket: Socket): void => {
         fromUserId: userId,
         candidate,
       });
+      // ICE candidates are high-frequency; only log type for debugging
+      console.log(`[Socket] ICE candidate relayed: ${callId} from ${userId} to ${toUserId}`);
     }
   );
 

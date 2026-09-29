@@ -690,6 +690,9 @@ export default function ChatDashboardPage() {
         currentUser={user}
         activeCall={activeCall}
         onCloseCall={() => setActiveCall(null)}
+        onCallIdUpdate={(callId) => {
+          setActiveCall((prev) => prev ? { ...prev, callId } : null);
+        }}
       />
     </div>
   );
