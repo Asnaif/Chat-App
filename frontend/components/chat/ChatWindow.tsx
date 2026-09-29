@@ -27,6 +27,8 @@ interface ChatWindowProps {
   onTypingStop: () => void;
   onBack: () => void;
   onStartCall?: (type: "audio" | "video") => void;
+  onOpenGroupInfo?: () => void;
+  onOpenUserProfile?: (userId: string) => void;
 }
 
 export const ChatWindow: React.FC<ChatWindowProps> = ({
@@ -43,6 +45,8 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   onTypingStop,
   onBack,
   onStartCall,
+  onOpenGroupInfo,
+  onOpenUserProfile,
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -104,6 +108,8 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
               key={msg._id || msg.tempId || Math.random().toString()}
               message={msg}
               isSelf={isSelf}
+              isGroup={chat.type === "group"}
+              onUserClick={onOpenUserProfile}
               onDeleteMessage={onDeleteMessage}
             />
           );
@@ -121,6 +127,8 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         isOnline={isOnline}
         onBack={onBack}
         onStartCall={onStartCall}
+        onOpenGroupInfo={onOpenGroupInfo}
+        onOpenUserProfile={onOpenUserProfile}
       />
 
       {/* Messages Stream */}

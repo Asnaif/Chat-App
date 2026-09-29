@@ -28,5 +28,6 @@ router.use(authenticate);
 router.post('/', uploadMiddleware.single('file'), uploadFile);
 router.post('/sign', getUploadSignature);
 router.post('/file', upload.single('file'), uploadDirect);
+router.post('/', upload.single('file'), uploadDirect);
 
 export default router;

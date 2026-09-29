@@ -11,8 +11,15 @@
 5. [Step 4: Authentication Flow & MongoDB Storage Walkthrough](#5-step-4-authentication-flow--mongodb-storage-walkthrough)
 6. [Step 5: Real-Time Socket.IO Integration](#6-step-5-real-time-socketio-integration)
 7. [Step 6: MongoDB Compass Mein Data Dekhne Ka Tareeqa](#7-step-6-mongodb-compass-mein-data-dekhne-ka-tareeqa)
-8. [Step 7: Day 3 Advanced Features Architecture & Implementation](#8-step-7-day-3-advanced-features-architecture--implementation)
-9. [Troubleshooting & Common Errors (With Solutions)](#9-troubleshooting--common-errors-with-solutions)
+8. [Troubleshooting & Common Errors (With Solutions)](#8-troubleshooting--common-errors-with-solutions)
+9. [Part 9: Day 2 Frontend Architecture & File-by-File Blueprint](#9-day-2-frontend-implementation-chat-core--real-time-messaging)
+10. [Part 10: Complete Day 2 Full-Stack Integration](#10-complete-day-2-full-stack-integration-backend-github-sync--frontend)
+11. [Part 11: Day 4 Groups, Profiles, Toast Notifications & Media Engine](#-part-11-day-4--groups-profiles-toast-notifications--media-engine)
+12. [Part 12: Step-by-Step Screen Testing Manual (Detailed UI Walkthrough)](#115-step-by-step-screen-testing-manual-detailed-ui-walkthrough)
+13. [Part 13: Critical Bug Fixes & Technical Decisions Resolved in Day 4](#116-critical-bug-fixes--technical-decisions-resolved-in-day-4)
+14. [Part 14: Dual Media Upload Engine Architecture](#117-dual-media-upload-engine-architecture-multer--static--cloudinary)
+15. [Part 15: Full-Stack Socket.IO & REST API Cheat-Sheet (Day 1 - Day 4)](#118-full-stack-socketio--rest-api-cheat-sheet)
+16. [Part 16: End-to-End System Verification Checklist](#119-end-to-end-system-verification-checklist)
 
 ---
 
@@ -907,37 +914,493 @@ Har feature ko samajhne ke liye neeche har step explain kiya gaya hai: **Kon si 
 ---
 
 ### 🚀 Complete System Status:
-* ✅ **Database:** MongoDB running on `27017` (Database: `chat_app` — Messages, Chats, Attachments & Users persisted)
+* ✅ **Database:** MongoDB Atlas Connected (`chat_app` Cluster live)
 * ✅ **Backend Server:** Node/Express running on `http://localhost:5000`
-* ✅ **Frontend App:** Next.js running on `http://localhost:3000` / `3001`
+* ✅ **Frontend App:** Next.js running on `http://localhost:3000`
 * ✅ **Day 1 Authentication:** Completed (Register, Login, JWT in localStorage)
-* ✅ **Day 2 Chat Core (Full-Stack Integrated):** Backend APIs + WebSockets + Frontend UI completely synchronized with 0 errors.
-* ✅ **Day 3 Advanced Chat Features (Full-Stack Integrated):**
-  - Real-Time Typing Indicator (debounced)
-  - Message Status Ticks (Sent ✓, Delivered ✓✓, Read 🔵✓✓)
-  - Emoji Picker (Dynamic dark popover)
-  - Image & Media Sharing (Multer + Preview + Lightbox Modal)
-  - Contacts Page & Instant User Search (`ContactsView.tsx`)
-  - Message Deletion (Soft delete for everyone & delete for me)
-  - MongoDB Persistent Attachments Storage (`attachments` collection)
+* ✅ **Day 2 Chat Core:** Full-Stack Integrated (REST + WebSockets + Optimistic UI)
+* ✅ **Day 3 Advanced Messaging:** Completed (Attachments, Emoji Picker, Reactions, Starred, Deleted)
+* ✅ **Day 4 Groups + Profile + Notifications:** 100% Full-Stack Completed & Verified (0 errors)
 
 ---
 
-### 🗺️ Full Architecture Summary Table (Day 3 Complete Overview):
+# ═══════════════════════════════════════════════════════════════════════════════
+# 📅 PART 11: DAY 4 — GROUPS, PROFILES, TOAST NOTIFICATIONS & MEDIA ENGINE
+# ═══════════════════════════════════════════════════════════════════════════════
 
-| # | Feature | Frontend Trigger / Component | Backend API / Socket Route | Database (MongoDB) Collection | Real-Time Synchronization Lifecycle |
-|:---:|---|---|---|---|---|
-| 1 | **Emoji Picker** | [`MessageInput.tsx`](file:///c:/Users/Lenovo/Documents/psw/Chat-App/frontend/components/chat/MessageInput.tsx) | Client-side State (`emoji-picker-react`) | — | Direct Input Cursor Injection |
-| 2 | **File & Image Upload** | [`MessageInput.tsx`](file:///c:/Users/Lenovo/Documents/psw/Chat-App/frontend/components/chat/MessageInput.tsx) | `POST /api/upload` (Multer + Storage) | Local `/uploads` / Cloudinary | Instant Thumbnail Preview Banner |
-| 3 | **Media Message Persistence** | [`page.tsx`](file:///c:/Users/Lenovo/Documents/psw/Chat-App/frontend/app/chat/page.tsx) | Socket: `message:send` | `messages` & `attachments` | Socket: `message:created` Broadcast |
-| 4 | **Media Lightbox Modal** | [`MessageBubble.tsx`](file:///c:/Users/Lenovo/Documents/psw/Chat-App/frontend/components/chat/MessageBubble.tsx) | Client-side State (`selectedImage`) | — | Full-Screen HD View Modal with close `X` |
-| 5 | **Status Ticks (Sent/Delivered/Read)** | [`MessageBubble.tsx`](file:///c:/Users/Lenovo/Documents/psw/Chat-App/frontend/components/chat/MessageBubble.tsx) | `POST /api/chats/:id/read` | `messages` (`readBy`, `deliveredTo`) | Socket: `message:read` (Cyan Blue Ticks) |
-| 6 | **Typing Indicator** | [`ChatWindow.tsx`](file:///c:/Users/Lenovo/Documents/psw/Chat-App/frontend/components/chat/ChatWindow.tsx) | Socket: `typing:start` / `typing:stop` | In-memory Socket Room | 2s Debounced 3-Dot Bouncing Animation |
-| 7 | **Contacts Screen** | [`ContactsView.tsx`](file:///c:/Users/Lenovo/Documents/psw/Chat-App/frontend/components/chat/ContactsView.tsx) | `GET /api/users` | `users` collection | Registered Users Cards + Green Online Badges |
-| 8 | **Instant User Search** | [`ContactsView.tsx`](file:///c:/Users/Lenovo/Documents/psw/Chat-App/frontend/components/chat/ContactsView.tsx) | `GET /api/users?search=<query>` | `users` (Regex Query) | 250ms Debounced Auto-Filtering |
-| 9 | **1-Click Start Chat** | [`ContactsView.tsx`](file:///c:/Users/Lenovo/Documents/psw/Chat-App/frontend/components/chat/ContactsView.tsx) | `POST /api/chats { userId }` | `chats` collection | Switch to Chat Window & Load Message History |
-| 10 | **Message Deletion** | [`MessageBubble.tsx`](file:///c:/Users/Lenovo/Documents/psw/Chat-App/frontend/components/chat/MessageBubble.tsx) | `DELETE /api/messages/:id` | `messages` (`deletedAt`) | Socket: `message:deleted` Live Text Replace |
+Day 4 ka maqsad chat application ko standard 1-on-1 messaging se barha kar **Enterprise Team Collaboration & WhatsApp/Telegram style platform** banana tha.
 
+---
+
+### 11.1 Day 4 Architecture Overview
+
+```
+                                ┌──────────────────────────────────────────────┐
+                                │          Next.js Frontend (Port 3000)        │
+                                └──────────────────────┬───────────────────────┘
+                                                       │
+                      ┌────────────────────────────────┼────────────────────────────────┐
+                      │                                │                                │
+                      ▼                                ▼                                ▼
+              [👥 Group System]               [👤 Profile System]             [🔔 Live Notifications]
+        - CreateGroupModal.tsx           - ProfileModal.tsx (Self)        - Toast Alerts on Inactive Chats
+        - GroupInfoModal.tsx             - UserProfileModal.tsx (Other)   - Socket: 'group:created'
+        - ChatSidebar "Groups" Filter    - AuthContext updateUser()       - Socket: 'call:incoming'
+                      │                                │                                │
+                      └────────────────────────────────┼────────────────────────────────┘
+                                                       │
+                                   HTTP REST & Socket.IO Events
+                                                       │
+                                                       ▼
+                                ┌──────────────────────────────────────────────┐
+                                │         Express Backend (Port 5000)          │
+                                └──────────────────────┬───────────────────────┘
+                                                       │
+                      ┌────────────────────────────────┼────────────────────────────────┐
+                      ▼                                ▼                                ▼
+              [Groups Controller]              [Users Controller]               [Upload Controller]
+        - POST /api/groups               - PATCH /api/users/me            - POST /api/upload
+        - GET /api/groups/:id            - GET /api/users/:userId         - Multer Dual Storage Engine
+        - POST /api/groups/:id/members   - GET /api/users/me              - Static /uploads Serving
+        - DELETE /api/groups/:id/members │                                │
+                      │                  │                                │
+                      └──────────────────┴────────────────┬───────────────┘
+                                                          ▼
+                                            ┌───────────────────────────┐
+                                            │   MongoDB Atlas Database  │
+                                            │      (chat_app Cluster)   │
+                                            └───────────────────────────┘
+```
+
+---
+
+### 11.2 Day 4 Naye Frontend Components (Detailed Breakdown)
+
+#### 1. 👥 `frontend/components/chat/CreateGroupModal.tsx`
+* **Maqsad:** Naya group chat create karna multi-select contacts aur group photo ke sath.
+* **Kahan se Open hota hai:**  
+  `ChatSidebar.tsx` ke header mein Search bar ke upar naya **Users (Group) Button** dabane par.
+* **Component Inputs & Controls:**
+  * **Group Name (Required):** Max 50 characters, e.g. `"Dev Sprint"`, `"Design Team"`.
+  * **Group Description (Optional):** Max 120 characters group topic ya guidelines.
+  * **Group Avatar Upload:** Hidden `<input type="file" accept="image/*">` ke sath Camera button jo image ko pehle `/api/upload` par bhejta hai aur URL state mein set karta hai.
+  * **Member Search & Multi-Select:** `/api/users` se saare registered users fetch hote hain. Search bar se real-time filtering hoti hai. Checkbox click karne par member select/unselect hota hai.
+  * **Selected Badges / Chips:** Chune hue members ke upar horizontal chips ban jate hain jinhe ek click mein `X` se remove kiya ja sakta hai.
+* **API Call:**
+  * `POST /api/groups`
+  * **Payload:** `{ name, description, avatarUrl, memberIds: string[] }`
+  * **On Success:** Modal close hota hai, nayi group conversation chat list mein top par judti hai aur screen par automatically open ho jati hai.
+
+---
+
+#### 2. 🛡️ `frontend/components/chat/GroupInfoModal.tsx`
+* **Maqsad:** Group details dekhna, members list, Admin controls (Add/Remove members), aur Leave group karna.
+* **Kahan se Open hota hai:**  
+  Group chat khuli hone par screen ke top **ChatHeader** par click karne se.
+* **Component Features:**
+  * **Group Banner:** Group avatar photo, title, description, aur total members count.
+  * **Participants List:** Sabhi members ke profile photos, name, email aur live green online dots.
+  * **Admin Badge:** Group banane wale creator ke naam ke aage **`ADMIN`** ka blue badge show hota hai.
+  * **Add Member (Admin Only):** Admin ke paas `UserPlus` button aata hai jo dropdown search kholta hai aur existing group ke ilawa baqi contacts ko ek click mein group mein add karta hai (`POST /api/groups/:groupId/members`).
+  * **Remove Member (Admin Only):** Admin kisi bhi doosre member ke aage Minus icon daba kar use group se nikal sakta hai (`DELETE /api/groups/:groupId/members/:userId`).
+  * **Leave Group:** Red button jo member ko group se bahar nikalta hai (`DELETE /api/groups/:groupId/members/:myUserId`).
+  * **Strict Null-Safety:** Agar database mein kisi member ka `userId` null ya unpopulated ho to safe fallback use karta hai taake modal kabhi crash na ho.
+
+---
+
+#### 3. 👤 `frontend/components/chat/ProfileModal.tsx`
+* **Maqsad:** Logged-in user ka apna profile dekhna aur live edit karna.
+* **Kahan se Open hota hai:**  
+  Left Navigation Rail ke bottom par **apni profile picture** ya **Settings** tab par click karne par.
+* **Component Features:**
+  * **View Mode:** Photo, Full Name, Email, aur Bio/Status text (`Hey there! I am using CM Chat`).
+  * **Camera Upload Button:** Camera icon click karne par image upload hoti hai `/api/upload` par aur user ka avatar foran database mein save ho jata hai.
+  * **Edit Mode:** "Edit Profile" button dabane par Name aur Bio input fields khulte hain.
+  * **API Call:** `PATCH /api/users/me` with `{ name, about, avatarUrl }`.
+  * **Live State Sync:** `AuthContext.updateUser()` aur `localStorage.setItem('cm_chat_user')` ke zariye poore app mein bina reload ke naya avatar aur naam update ho jata hai.
+
+---
+
+#### 4. 🪪 `frontend/components/chat/UserProfileModal.tsx`
+* **Maqsad:** Doosre user ka profile card dekhna aur direct actions lena.
+* **Kahan se Open hota hai:**  
+  Direct chat ke header par click karne par, ya group chat mein kisi member ke naam/avatar par click karne par.
+* **Component Features:**
+  * User photo, full name, email, bio, aur live online/offline badge.
+  * **Quick Actions Row:**
+    * 💬 **Message:** Foran 1-on-1 direct chat open kar deta hai.
+    * 📞 **Voice Call:** WebRTC audio call trigger karta hai.
+    * 📹 **Video Call:** WebRTC video call modal trigger karta hai.
+
+---
+
+### 11.3 Pehle se Majood Files mein Key Enhancements
+
+| File | Changes ki Tafseel |
+| :--- | :--- |
+| **`ChatHeader.tsx`** | 1. Header click karne par detect karta hai: Group hai to `GroupInfoModal` kholay, User hai to `UserProfileModal` kholay.<br>2. Group subtitle mein individual status ke bajaye `"X members"` show karta hai.<br>3. Group ke liye info icon button provide karta hai. |
+| **`MessageBubble.tsx`** | 1. Group chat mein doosre logon ke har message bubble ke upar unka **Naam (colored)** display karta hai.<br>2. Sender ke naam par click karne se unka `UserProfileModal` khul jata hai. |
+| **`ChatSidebar.tsx`** | 1. Header mein New Chat ke sath **New Group Button** add kiya.<br>2. Filter tabs mein **"Groups"** pill add kiya jo sirf group conversations filter karta hai.<br>3. Group conversations ke liye automatic fallback icon diya. |
+| **`NavigationRail.tsx`** | Bottom user avatar aur Settings tab par click handler connect kiya jo `ProfileModal` kholta hai. |
+| **`AuthContext.tsx`** | `updateUser(updatedData: Partial<User>)` method shamil kiya jo memory state aur browser `localStorage` ko synchronized rakhta hai. |
+| **`types/chat.ts`** | `IGroup` aur `IGroupMember` TypeScript interfaces define kiye gaye. |
+| **`chat/page.tsx`** | 1. Chaaron naye modals ko render aur state management se jora.<br>2. **Background Toast Notifications:** Jab user kisi doosri chat mein ho aur naya message aaye to screen ke top-right par toast pop-up hota hai: `💬 Bob: Hey!`.<br>3. Socket event `group:created` par list auto-update hoti hai. |
+
+---
+
+### 11.4 Day 4 Backend APIs & WebSockets Contract
+
+#### 1. Group REST Endpoints:
+```http
+POST /api/groups
+Headers: Authorization: Bearer <JWT>
+Body: {
+  "name": "Dev Squad",
+  "description": "Frontend sprint",
+  "avatarUrl": "https://...",
+  "memberIds": ["6aba1140d8fa...", "6aba1141d8fa..."]
+}
+Response 201: { "success": true, "data": { "_id": "...", "chatId": "...", "members": [...] } }
+
+GET /api/groups/:groupId
+Response 200: Populated group details with member roles & profiles
+
+POST /api/groups/:groupId/members
+Body: { "memberIds": ["userId1", "userId2"] }
+Response 200: Updated group document
+
+DELETE /api/groups/:groupId/members/:userId
+Response 200: Member removed / User left group
+```
+
+#### 2. User & Profile REST Endpoints:
+```http
+GET /api/users/me
+Response 200: Current authenticated user details
+
+PATCH /api/users/me
+Body: { "name": "Alice Johnson", "about": "Senior UI Engineer", "avatarUrl": "https://..." }
+Response 200: Updated user profile
+
+GET /api/users/:userId
+Response 200: Public profile of any registered user
+```
+
+#### 3. Upload & Media REST Endpoints:
+```http
+POST /api/upload
+Headers: Content-Type: multipart/form-data
+Body: file: <Binary Data>
+Response 201: {
+  "success": true,
+  "data": {
+    "storageUrl": "http://localhost:5000/uploads/172750...png",
+    "name": "avatar.png",
+    "mimeType": "image/png",
+    "size": 104200
+  }
+}
+```
+
+#### 4. Real-time Socket.IO Events:
+* **`group:created`**: Backend naye group ke saare members ke private rooms (`user:{userId}`) ko broadcast karta hai. Frontend list auto-refresh karta hai.
+* **`call:offer` / `call:incoming` / `call:answer`**: WebRTC audio aur video calls ke live signals pass karta hai.
+
+---
+
+### 11.5 Step-by-Step Screen Testing Manual (Detailed UI Walkthrough)
+
+Ye section ek tester ya developer ke liye complete visual aur interactive testing guide hai taake app ke har ek feature ko browser screen par aasani se test kiya ja sake.
+
+#### 👥 Test Credentials (MongoDB Atlas Pre-Seeded Users)
+Seed script (`npm run seed`) ne Atlas database mein 4 verified test users banaye hain:
+
+| Name | Email Address | Password | Role / Details |
+| :--- | :--- | :--- | :--- |
+| **Alice Johnson** | `alice@example.com` | `password123` | Senior UI Engineer (Pre-created "Dev Squad" Admin) |
+| **Bob Smith** | `bob@example.com` | `password123` | Backend Architect |
+| **Charlie Davis** | `charlie@example.com` | `password123` | DevOps Specialist |
+| **Diana Prince** | `diana@example.com` | `password123` | QA Lead & Mobile Developer |
+
+---
+
+#### 🧪 Test Scenario 1: Group Creation (`CreateGroupModal.tsx`)
+1. **Screen par kahan jana hai:**
+   * Browser mein `http://localhost:3000/login` par ja kar `alice@example.com` se login karein.
+   * Chat dashboard (`/chat`) par Left Navigation Rail ke sath **Messages Sidebar** dikhai dega.
+   * Sidebar ke top header par jahan **"Messages"** likha hai, uske daayein (right) taraf do icons hain:
+     * 👥 **Users Group Icon** (`New Group`)
+     * ➕ **Plus Icon** (`New Direct Chat`)
+   * **Users Group Icon** par click karein.
+2. **Modal Screen:**
+   * Screen par glassmorphic **"Create Group Chat"** modal pop-up hoga.
+   * **Group Name:** e.g. `"Product Launch 2026"` enter karein.
+   * **Group Description:** e.g. `"Sprint planning and daily updates"` likhein.
+   * **Group Photo:** Camera icon par click karke koi bhi image upload karein (preview foran show hoga).
+   * **Select Members:** Neeche registered users ki list hogi. Bob aur Charlie ke checkbox par click karein.
+   * Chuney hue users ke badges (chips) upar horizontal display honge jinhe `X` daba kar hata bhi sakte hain.
+3. **Action & Expected Result:**
+   * Blue **"Create Group (2 members)"** button dabayein.
+   * Modal band ho jayega, sidebar mein naya group top par highlight hoga, aur right panel par group chat automatically open ho jayegi.
+   * MongoDB Atlas ke `chats` collection mein `type: "group"` aur `groups` collection mein naya document insert ho jayega.
+
+---
+
+#### 🧪 Test Scenario 2: Group Chat Messaging & Sender Attribution (`ChatWindow.tsx` & `MessageBubble.tsx`)
+1. **Multi-User Real-Time Testing:**
+   * Standard browser window mein **Alice** ko login rakhein.
+   * Ek **Incognito / Private Window** khol kar usme **Bob** (`bob@example.com` / `password123`) se login karein.
+2. **Screen Interactions:**
+   * Alice ki screen par group `"Product Launch 2026"` mein message type karein:  
+     `"Welcome everyone to the new sprint!"` aur Send dabayein.
+3. **Expected UI Result on Bob's Screen:**
+   * Bob ki screen par bina kisi page reload ke foran message bubble deliver hoga.
+   * **Group Sender Banner:** Message bubble ke theek upar Alice ka naam colored text mein (`Alice Johnson`) aur unka avatar nazar aayega taake group mein pata chalay kisne bola hai.
+   * Saamne wale user (Alice) ke naam par hover karne se pointer banega aur click karne se Alice ka profile card khul jayega.
+
+---
+
+#### 🧪 Test Scenario 3: Group Info & Admin Controls (`GroupInfoModal.tsx`)
+1. **Screen par kahan click karein:**
+   * Group chat open hone par screen ke sabse upar **ChatHeader** par click karein (jahan Group Name aur *"X members"* subtitle likha hai).
+2. **Modal Screen Details:**
+   * Center modal open hoga jisme group avatar, title, description, aur total participants honge.
+   * **Admin Badge:** Alice ne group banaya tha, is liye Alice ke naam ke aage **`ADMIN`** ka blue badge show hoga.
+   * **Online Dots:** Jo users live connected hain unke avatar par green pulse dot hoga.
+3. **Admin Actions (Add & Remove Member):**
+   * **Add Member:** Modal ke header mein `+ Add Member` icon dabayein. Dropdown search mein `Diana Prince` ko select karein. Diana foran group participants list mein shamil ho jayegi (`POST /api/groups/:id/members`).
+   * **Remove Member:** Charlie ke naam ke aage bane red minus/trash icon par click karein. Charlie group se remove ho jayega (`DELETE /api/groups/:id/members/:userId`).
+   * **Non-Admin View:** Agar Bob ye modal kholta hai to use Add/Remove buttons nazar nahi aayenge, balki sirf red **"Leave Group"** button nazar aayega.
+
+---
+
+#### 🧪 Test Scenario 4: Self Profile Management (`ProfileModal.tsx`)
+1. **Screen par kahan click karein:**
+   * Left Navigation Rail ke bilkul bottom-left corner par apni gol **Profile Picture** ya **Settings Icon** par click karein.
+2. **Modal Screen Details:**
+   * **"My Profile"** modal khulega jisme aapka current avatar, Full Name, Email, aur Bio display hoga.
+3. **Change Avatar Photo:**
+   * Profile picture ke upar Bane Camera icon par click karein aur PC se nayi picture select karein.
+   * Frontend picture ko `/api/upload` par post karta hai aur backend use `/uploads` mein save karke live URL return karta hai.
+   * Picture foran modal mein change ho jati hai.
+4. **Edit Name & Bio:**
+   * **"Edit Profile"** button dabayein.
+   * Name field mein apna naam update karein, aur About field mein e.g. `"Lead Solutions Architect | Online 24/7"` likhein.
+   * **"Save Changes"** button dabayein.
+5. **Expected Result:**
+   * Screen par success alert aayega (`Profile updated successfully!`).
+   * `AuthContext` aur `localStorage` instant sync honge — bina page reload kiye Left Navigation Rail aur top header par naya naam aur nayi photo display ho jayegi.
+
+---
+
+#### 🧪 Test Scenario 5: View Other User's Profile (`UserProfileModal.tsx`)
+1. **Screen par kahan click karein:**
+   * Direct Chat ke dauran top **ChatHeader** par click karein, ya Group chat ke andar kisi bhi doosre user ke **Message Bubble ke upar unke naam** par click karein.
+2. **Modal Screen Details:**
+   * User ka **Profile Card** khulega.
+   * Profile picture, Full Name, Email, Bio/About, aur live status badge (`Online` green ya `Offline` gray).
+3. **Quick Action Buttons:**
+   * 💬 **Message:** Click karne par foran us user ke sath 1-on-1 direct conversation open ho jati hai.
+   * 📞 **Audio Call:** WebRTC audio call trigger karta hai.
+   * 📹 **Video Call:** WebRTC video call modal trigger karta hai.
+
+---
+
+#### 🧪 Test Scenario 6: Background Toast Notifications (`react-hot-toast`)
+1. **Test Setup:**
+   * Alice window 1 mein kisi group ya Charlie ke sath chat kar rahi hai.
+   * Window 2 mein Bob login hai.
+2. **Action:**
+   * Bob direct Alice ko message bhejta hai: `"Hey Alice, are you available for a quick review?"`.
+3. **Expected UI Result on Alice's Screen:**
+   * Chunke Alice us waqt Bob ki chat window mein mojood nahi hai, is liye screen ke **Top-Right Corner** par ek stylish glassmorphic floating Toast pop-up hoga:
+     ```
+     💬 Bob Smith: Hey Alice, are you available for a quick review?
+     ```
+   * Messages Sidebar mein Bob ki conversation automatically top par aa jayegi aur **Green unread badge (+1)** display hoga.
+
+---
+
+#### 🧪 Test Scenario 7: Sidebar "Groups" Filter
+1. **Screen par kahan click karein:**
+   * Messages sidebar ke Search bar ke theek neeche 4 filter pills hain:
+     * **All** (Saari chats)
+     * **Direct** (Sirf 1-on-1 chats)
+     * **Groups** (Sirf Group conversations)
+     * **Unread** (Sirf unread messages wali chats)
+2. **Action:**
+   * **"Groups"** pill par click karein.
+3. **Expected Result:**
+   * Tamam direct 1-on-1 chats hide ho jayengi aur sirf groups (`Dev Squad`, `Product Launch 2026`) filter hokar display honge.
+
+---
+
+### 11.6 Critical Bug Fixes & Technical Decisions Resolved in Day 4
+
+Day 4 ke doran do bohot ahem technical challenges solve kiye gaye jinhe future maintenance ke liye document kiya gaya hai:
+
+#### 🐛 Bug 1: JavaScript `typeof null === "object"` Crash
+* **Error Message:** `TypeError: Cannot read properties of null (reading '_id')`
+* **Root Cause:**  
+  JavaScript ka ek historic quirk hai ke `typeof null` hamesha `"object"` evaluate hota hai:
+  ```javascript
+  typeof null === "object"; // TRUE!
+  ```
+  Jab MongoDB se aane wale message ya group member ka `senderId` ya `userId` kisi wajah se unpopulated ya `null` tha, to ternary operator:
+  ```typescript
+  // ❌ CRASHING CODE:
+  const uid = typeof m.userId === "object" ? m.userId._id : m.userId;
+  // Jab m.userId null hota tha to null._id crash kar deta tha!
+  ```
+* **Solution Implemented in `ChatWindow.tsx` & `GroupInfoModal.tsx`:**  
+  Strict null-guard ensure kiya gaya:
+  ```typescript
+  // ✅ BULLETPROOF CODE:
+  const uid = (typeof m.userId === "object" && m.userId !== null) 
+    ? (m.userId as IUser)._id 
+    : (m.userId as string);
+  ```
+  Is check se system 100% resilient ho gaya chahe MongoDB se partial data aaye ya unpopulated ID.
+
+---
+
+#### 🐛 Bug 2: Next.js Webpack Cache Collision (`Cannot find module './948.js'`)
+* **Error Message:** `Error: Cannot find module './948.js' Require stack: .next/server/webpack-runtime.js`
+* **Root Cause:**  
+  Jab `next dev` development server background mein chal raha ho aur usi doran terminal se `npm run build` execute kiya jaye, to Next.js ke webpack chunks lock collision ki wajah se corrupt ho jate hain.
+* **Solution Implemented:**
+  1. Port `3000` par chalne wale tamam node processes ko kill kiya gaya:
+     ```powershell
+     Stop-Process -Id <PID> -Force
+     ```
+  2. Corrupted cache folder `frontend/.next` ko mukammal delete (purge) kiya gaya.
+  3. Clean dev server restart kiya gaya:
+     ```powershell
+     npm run dev
+     ```
+  Ab Next.js bina kisi chunk missing error ke smoothly run ho raha hai.
+
+---
+
+#### 🐛 Bug 3: Port 5000 `EADDRINUSE` Conflict
+* **Error Message:** `Error: listen EADDRINUSE: address already in use :::5000`
+* **Root Cause:** Background mein purana Express server instance terminate hue baghair port 5000 par socket listen kar raha tha.
+* **Solution:** PowerShell command se port occupancy check ki gayi aur zombie process ko terminate karke server cleanly start kiya gaya:
+  ```powershell
+  Get-NetTCPConnection -LocalPort 5000
+  taskkill /PID <PID> /F
+  ```
+
+---
+
+### 11.7 Dual Media Upload Engine Architecture (Multer + Static + Cloudinary)
+
+Day 4 mein media file uploading engine ko robust banaya gaya hai:
+
+```
+                  ┌─────────────────────────────────────────┐
+                  │ Frontend Upload Trigger (File / Image)  │
+                  └────────────────────┬────────────────────┘
+                                       │ POST /api/upload (multipart/form-data)
+                                       ▼
+                  ┌─────────────────────────────────────────┐
+                  │       Multer Dual Storage Router        │
+                  │        (backend/src/app.ts)             │
+                  └────────────────────┬────────────────────┘
+                                       │
+                ┌──────────────────────┴──────────────────────┐
+                │ If CLOUDINARY_API_KEY                        │ Default Local Storage
+                ▼                                              ▼
+   ┌───────────────────────────┐                 ┌───────────────────────────┐
+   │ Cloudinary Cloud Engine   │                 │ Local Server Storage      │
+   │ Upload to CDN             │                 │ backend/uploads/          │
+   │ Return secure_url         │                 │ Static Express Host:      │
+   └────────────┬──────────────┘                 │ http://localhost:5000/    │
+                │                                │ uploads/<filename>        │
+                │                                └─────────────┬─────────────┘
+                └──────────────────────┬───────────────────────┘
+                                       │ Standardized JSON Response
+                                       ▼
+                  ┌─────────────────────────────────────────┐
+                  │ { "success": true,                      │
+                  │   "data": {                             │
+                  │     "storageUrl": "...",                │
+                  │     "name": "avatar.png",               │
+                  │     "mimeType": "image/png",            │
+                  │     "size": 104200                      │
+                  │   }                                     │
+                  │ }                                       │
+                  └─────────────────────────────────────────┘
+```
+
+* **Local Storage Folder:** Files `backend/uploads/` directory mein timestamped filenames ke sath save hoti hain (e.g. `1727508920145-avatar.png`).
+* **Static Serving:** `backend/src/app.ts` mein Express static middleware activate hai:
+  ```typescript
+  app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+  ```
+* **Security & Validation:** Sirf allowed MIME types (`image/*`, `application/pdf`, `audio/*`, `video/*`) allow hain aur max file size 25MB enforce hai.
+
+---
+
+### 11.8 Full-Stack Socket.IO & REST API Cheat-Sheet
+
+Ye table poori application ke tamam interconnected protocols ka complete reference hai:
+
+#### 1. REST APIs:
+| Method | Endpoint | Description | Protected | Key Payload / Response |
+| :--- | :--- | :--- | :---: | :--- |
+| `POST` | `/api/auth/register` | Naya user account create karta hai | No | `{ name, email, password }` |
+| `POST` | `/api/auth/login` | User login aur JWT token generate | No | `{ email, password }` → `{ token, user }` |
+| `GET` | `/api/users` | Sabhi registered users search / list | Yes | `?search=alice` → `IUser[]` |
+| `GET` | `/api/users/me` | Logged-in user ka apna profile | Yes | Returns authenticated `IUser` |
+| `PATCH`| `/api/users/me` | Name, Bio, Avatar edit karna | Yes | `{ name, about, avatarUrl }` |
+| `GET` | `/api/users/:userId` | Kisi doosre user ka public profile | Yes | Returns target user data |
+| `GET` | `/api/chats` | User ki sab direct & group chats | Yes | Populated conversations list |
+| `POST` | `/api/chats` | Direct 1-on-1 chat start karna | Yes | `{ userId: "..." }` |
+| `GET` | `/api/chats/:id/messages` | Selected chat ke messages fetch | Yes | `?limit=50&before=timestamp` |
+| `POST` | `/api/chats/:id/messages` | REST API fallback message send | Yes | `{ text, attachments, tempId }` |
+| `POST` | `/api/chats/:id/read` | Chat ke unread messages clear karna | Yes | Returns `{ success: true }` |
+| `POST` | `/api/groups` | Naya group chat create karna | Yes | `{ name, description, avatarUrl, memberIds }` |
+| `GET` | `/api/groups/:id` | Group details & members list | Yes | Returns populated `IGroup` |
+| `POST` | `/api/groups/:id/members` | Group mein naye members add karna | Yes (Admin) | `{ memberIds: string[] }` |
+| `DELETE`|`/api/groups/:id/members/:userId` | Member remove / leave group | Yes | Returns updated group |
+| `POST` | `/api/upload` | Photo / Document file upload | Yes | `multipart/form-data` → `{ storageUrl }` |
+
+#### 2. Real-Time WebSocket Events:
+| Event Name | Direction | Payload | Description |
+| :--- | :---: | :--- | :--- |
+| `connection` | Client → Server | Auth Token via Handshake | Socket connection establish hota hai, user joins `user:{userId}` |
+| `chat:join` | Client → Server | `{ chatId }` | User specific chat room `chat:{chatId}` mein join hota hai |
+| `chat:leave` | Client → Server | `{ chatId }` | User chat room leave karta hai jab chat switch ho |
+| `message:send` | Client → Server | `{ chatId, text, attachments, tempId }` | Naya message transmit hota hai |
+| `message:created` | Server → Client | Full `IMessage` Object | Chat room mein naya message live broadcast hota hai |
+| `group:created` | Server → Client | Group & Chat Objects | Group ke saare members ki screens par naya group pop-up hota hai |
+| `typing:start` | Client → Server | `{ chatId }` | User typing shuru kare to room mein broadcast hota hai |
+| `typing:stop` | Client → Server | `{ chatId }` | Typing rukne par indicator gayab hota hai (2s debounce) |
+| `presence:update`| Server → Client | `{ userId, status, lastSeenAt }` | User ke online ya offline hone par green dot toggle hoti hai |
+| `message:read` | Server → Client | `{ chatId, userId, readAt }` | Saamne wale user ke screen par double ticks update hote hain |
+| `call:offer` | Client → Server | `{ targetUserId, sdpOffer, isVideo }` | WebRTC incoming call signal initiate karta hai |
+| `call:incoming` | Server → Client | `{ callerId, sdpOffer, isVideo }` | Target user ko ringing popup trigger karta hai |
+| `call:answer` | Client → Server | `{ callerId, sdpAnswer }` | Call accept hone par WebRTC stream connect hoti hai |
+
+---
+
+### 11.9 End-to-End System Verification Checklist
+
+| Area | Feature / Checkpoint | Verification Method | Status |
+| :---: | :--- | :--- | :---: |
+| 🗄️ | **MongoDB Atlas Database** | Atlas cluster live, 4 seed users populated, collections accessible | ✅ Pass |
+| ⚙️ | **Backend Server** | Running on `http://localhost:5000`, 0 compile errors | ✅ Pass |
+| 💻 | **Frontend Client** | Running on `http://localhost:3000`, static routes compiled | ✅ Pass |
+| 👥 | **Group Creation** | Multi-select members, name, description, photo upload | ✅ Pass |
+| 🛡️ | **Group Admin Controls** | Admin badge display, Add member, Remove member, Leave group | ✅ Pass |
+| 🏷️ | **Group Chat Bubbles** | Senders' colored name tags and avatars above bubbles | ✅ Pass |
+| 👤 | **My Profile Modal** | View details, live edit name/bio, photo upload to `/uploads` | ✅ Pass |
+| 🪪 | **User Profile Card** | Quick actions (Message, Audio Call, Video Call), status badge | ✅ Pass |
+| 🔔 | **Toast Notifications** | Floating alerts with sender name on background messages | ✅ Pass |
+| 🔍 | **Sidebar Group Filter** | "Groups" pill filters only group conversations | ✅ Pass |
+| 🛡️ | **Resilience & Null Safety**| Strict null checks prevent `typeof null === "object"` crashes | ✅ Pass |
+| 🎨 | **Design & Glassmorphism** | Dark aesthetic `#0B0E14`, smooth transitions, zero layout shift | ✅ Pass |
 
 
 

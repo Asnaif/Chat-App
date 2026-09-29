@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/api";
 import { getSocket } from "@/lib/socket";
-import { IChat, IMessage, IAttachment } from "@/types/chat";
+import { IChat, IMessage, IAttachment, IUser } from "@/types/chat";
 import { NavigationRail } from "@/components/chat/NavigationRail";
 import { ChatSidebar } from "@/components/chat/ChatSidebar";
 import { ContactsView } from "@/components/chat/ContactsView";
@@ -14,6 +14,10 @@ import { EmptyChatState } from "@/components/chat/EmptyChatState";
 import { NewChatModal } from "@/components/chat/NewChatModal";
 import { CallModal, ActiveCallData } from "@/components/chat/CallModal";
 import { CallsView } from "@/components/chat/CallsView";
+import { CreateGroupModal } from "@/components/chat/CreateGroupModal";
+import { GroupInfoModal } from "@/components/chat/GroupInfoModal";
+import { ProfileModal } from "@/components/chat/ProfileModal";
+import { UserProfileModal } from "@/components/chat/UserProfileModal";
 import toast from "react-hot-toast";
 
 export default function ChatDashboardPage() {
@@ -33,6 +37,10 @@ export default function ChatDashboardPage() {
   // UI Interactive States
   const [activeTab, setActiveTab] = useState<"chats" | "contacts" | "calls" | "settings">("chats");
   const [isNewChatOpen, setIsNewChatOpen] = useState<boolean>(false);
+  const [isCreateGroupOpen, setIsCreateGroupOpen] = useState<boolean>(false);
+  const [isGroupInfoOpen, setIsGroupInfoOpen] = useState<boolean>(false);
+  const [isProfileOpen, setIsProfileOpen] = useState<boolean>(false);
+  const [selectedUserProfileId, setSelectedUserProfileId] = useState<string | null>(null);
   const [isTyping, setIsTyping] = useState<boolean>(false);
   const [typingUserName, setTypingUserName] = useState<string>("");
   const [activeCall, setActiveCall] = useState<ActiveCallData | null>(null);
@@ -122,6 +130,24 @@ export default function ChatDashboardPage() {
           return prevChats;
         }
       });
+
+      // 3. Toast notification for incoming messages from others when not in active chat
+      const senderIdStr =
+        typeof newMsg.senderId === "object" && newMsg.senderId !== null
+          ? (newMsg.senderId as IUser)?._id
+          : newMsg.senderId;
+
+      if (senderIdStr && senderIdStr !== user?._id) {
+        if (!currentActive || currentActive._id !== newMsg.chatId) {
+          const senderName =
+            typeof newMsg.senderId === "object" && newMsg.senderId !== null
+              ? (newMsg.senderId as IUser)?.name || "Contact"
+              : "Contact";
+          const snippet =
+            newMsg.text || (newMsg.attachments?.length ? "Sent an attachment 📎" : "New message");
+          toast(`💬 ${senderName}: ${snippet}`, { duration: 4000, position: "top-right" });
+        }
+      }
     };
 
     // Listen to chat list updates
@@ -265,6 +291,11 @@ export default function ChatDashboardPage() {
       });
     };
 
+    const handleGroupCreatedEvent = (newGroup: { name?: string }) => {
+      fetchChats();
+      toast(`👥 You were added to group "${newGroup?.name || 'Group'}"!`, { icon: "🎉" });
+    };
+
     socket.on("message:created", handleNewMessage);
     socket.on("chat:updated", handleChatUpdated);
     socket.on("presence:update", handlePresenceUpdate);
@@ -274,6 +305,7 @@ export default function ChatDashboardPage() {
     socket.on("message:updated", handleMessageUpdated);
     socket.on("message:deleted", handleMessageDeleted);
     socket.on("call:incoming", handleCallIncoming);
+    socket.on("group:created", handleGroupCreatedEvent);
 
     return () => {
       socket.off("message:created", handleNewMessage);
@@ -285,6 +317,7 @@ export default function ChatDashboardPage() {
       socket.off("message:updated", handleMessageUpdated);
       socket.off("message:deleted", handleMessageDeleted);
       socket.off("call:incoming", handleCallIncoming);
+      socket.off("group:created", handleGroupCreatedEvent);
     };
   }, [isAuthenticated, user?._id, fetchChats]);
 
@@ -458,6 +491,33 @@ export default function ChatDashboardPage() {
     router.push("/login");
   };
 
+  const handleStartChatWithUser = async (targetUserId: string) => {
+    try {
+      const res = await api.post("/api/chats", { userId: targetUserId });
+      const chatData = res.data?.data || res.data;
+      if (chatData) {
+        setChats((prev) => {
+          if (prev.some((c) => c._id === chatData._id)) return prev;
+          return [chatData, ...prev];
+        });
+        setActiveChat(chatData);
+        setActiveTab("chats");
+      }
+    } catch (err: unknown) {
+      console.error("Failed to start chat:", err);
+      toast.error("Could not start conversation");
+    }
+  };
+
+  const handleGroupCreated = (newChat: IChat) => {
+    setChats((prev) => {
+      if (prev.some((c) => c._id === newChat._id)) return prev;
+      return [newChat, ...prev];
+    });
+    setActiveChat(newChat);
+    setActiveTab("chats");
+  };
+
   if (authLoading) {
     return (
       <div className="h-screen w-screen bg-[#131722] flex items-center justify-center">
@@ -502,6 +562,7 @@ export default function ChatDashboardPage() {
           }}
           onLogout={handleLogout}
           onOpenNewChat={() => setIsNewChatOpen(true)}
+          onOpenProfile={() => setIsProfileOpen(true)}
         />
       </div>
 
@@ -530,6 +591,7 @@ export default function ChatDashboardPage() {
             onlineUserIds={onlineUserIds}
             onSelectChat={(chat) => setActiveChat(chat)}
             onOpenNewChat={() => setIsNewChatOpen(true)}
+            onOpenCreateGroup={() => setIsCreateGroupOpen(true)}
             loading={loadingChats}
           />
         </div>
@@ -558,6 +620,8 @@ export default function ChatDashboardPage() {
                 handleStartCall(otherParticipant, type);
               }
             }}
+            onOpenGroupInfo={() => setIsGroupInfoOpen(true)}
+            onOpenUserProfile={(uid) => setSelectedUserProfileId(uid)}
           />
         ) : (
           <EmptyChatState onOpenNewChat={() => setIsNewChatOpen(true)} />
@@ -578,7 +642,49 @@ export default function ChatDashboardPage() {
         }}
       />
 
-      {/* 5. WebRTC Calling Modal / Active Call Overlay */}
+      {/* 5. Create Group Modal */}
+      <CreateGroupModal
+        isOpen={isCreateGroupOpen}
+        onClose={() => setIsCreateGroupOpen(false)}
+        onGroupCreated={handleGroupCreated}
+      />
+
+      {/* 6. Group Info Modal */}
+      <GroupInfoModal
+        isOpen={isGroupInfoOpen}
+        onClose={() => setIsGroupInfoOpen(false)}
+        chat={activeChat}
+        currentUser={user}
+        onlineUserIds={onlineUserIds}
+        onGroupUpdated={fetchChats}
+        onLeaveGroup={() => {
+          setActiveChat(null);
+          fetchChats();
+        }}
+      />
+
+      {/* 7. My Profile Modal */}
+      <ProfileModal
+        isOpen={isProfileOpen}
+        onClose={() => setIsProfileOpen(false)}
+      />
+
+      {/* 8. Other User Profile Modal */}
+      <UserProfileModal
+        isOpen={Boolean(selectedUserProfileId)}
+        onClose={() => setSelectedUserProfileId(null)}
+        userId={selectedUserProfileId}
+        onStartChat={handleStartChatWithUser}
+        onStartCall={(uid, type) => {
+          const participant = activeChat?.participantIds.find((p) => p._id === uid);
+          if (participant) {
+            handleStartCall(participant, type);
+          }
+        }}
+        isOnline={selectedUserProfileId ? onlineUserIds.has(selectedUserProfileId) : false}
+      />
+
+      {/* 9. WebRTC Calling Modal / Active Call Overlay */}
       <CallModal
         currentUser={user}
         activeCall={activeCall}

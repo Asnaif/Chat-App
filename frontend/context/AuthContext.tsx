@@ -26,6 +26,7 @@ interface AuthContextType {
     profilePhoto?: string
   ) => Promise<boolean>;
   logout: () => void;
+  updateUser: (updatedData: Partial<User>) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -166,6 +167,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     toast.success("Logged out successfully.");
   };
 
+  const updateUser = (updatedData: Partial<User>) => {
+    setUser((prev) => {
+      if (!prev) return null;
+      const updated = { ...prev, ...updatedData };
+      localStorage.setItem("cm_chat_user", JSON.stringify(updated));
+      return updated;
+    });
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -176,6 +186,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         login,
         register,
         logout,
+        updateUser,
       }}
     >
       {children}

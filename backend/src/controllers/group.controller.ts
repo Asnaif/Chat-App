@@ -90,9 +90,15 @@ export const getGroups = async (req: Request, res: Response, next: NextFunction)
 export const getGroupDetails = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const groupId = req.params.groupId as string;
-    const group = await Group.findById(groupId)
+    let group = await Group.findById(groupId)
       .populate('members.userId', 'name email avatarUrl status lastSeenAt')
       .populate('createdBy', 'name email avatarUrl');
+
+    if (!group) {
+      group = await Group.findOne({ chatId: groupId })
+        .populate('members.userId', 'name email avatarUrl status lastSeenAt')
+        .populate('createdBy', 'name email avatarUrl');
+    }
 
     if (!group) {
       throw new ApiError(404, 'Group not found', 'GROUP_NOT_FOUND');
@@ -111,13 +117,16 @@ export const addMembers = async (req: Request, res: Response, next: NextFunction
   try {
     const groupId = req.params.groupId as string;
     const currentUserId = req.user?.userId;
-    const { userIds } = req.body;
+    const userIds = req.body.userIds || req.body.memberIds;
 
     if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
-      throw new ApiError(400, 'userIds array is required', 'VALIDATION_ERROR');
+      throw new ApiError(400, 'userIds or memberIds array is required', 'VALIDATION_ERROR');
     }
 
-    const group = await Group.findById(groupId);
+    let group = await Group.findById(groupId);
+    if (!group) {
+      group = await Group.findOne({ chatId: groupId });
+    }
     if (!group) {
       throw new ApiError(404, 'Group not found', 'GROUP_NOT_FOUND');
     }
@@ -198,7 +207,10 @@ export const removeMember = async (req: Request, res: Response, next: NextFuncti
     const userIdToRemove = req.params.userId as string;
     const currentUserId = req.user?.userId;
 
-    const group = await Group.findById(groupId);
+    let group = await Group.findById(groupId);
+    if (!group) {
+      group = await Group.findOne({ chatId: groupId });
+    }
     if (!group) {
       throw new ApiError(404, 'Group not found', 'GROUP_NOT_FOUND');
     }

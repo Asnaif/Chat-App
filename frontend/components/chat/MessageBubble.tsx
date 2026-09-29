@@ -18,16 +18,26 @@ import {
 interface MessageBubbleProps {
   message: IMessage;
   isSelf: boolean;
+  isGroup?: boolean;
+  onUserClick?: (userId: string) => void;
   onDeleteMessage?: (messageId: string, forEveryone: boolean) => void;
 }
 
 export const MessageBubble: React.FC<MessageBubbleProps> = ({
   message,
   isSelf,
+  isGroup = false,
+  onUserClick,
+}) => {
   onDeleteMessage,
 }) => {
   const [showMenu, setShowMenu] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+
+  const senderUser = typeof message.senderId === "object" && message.senderId !== null
+    ? message.senderId
+    : null;
+  const senderName = senderUser?.name || "Participant";
 
   const formatTime = (dateStr: string) => {
     try {
@@ -60,6 +70,23 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               : "bg-[#2A3142] text-white/95 rounded-tl-xs border border-[#343E54]"
           } ${message.isPending ? "opacity-75" : "opacity-100"}`}
         >
+          {/* Group Chat Sender Name */}
+          {isGroup && !isSelf && (
+            <div
+              onClick={() => senderUser?._id && onUserClick?.(senderUser._id)}
+              className="flex items-center gap-1.5 mb-1 cursor-pointer hover:opacity-80 transition-opacity"
+              title="View profile"
+            >
+              <span className="text-[11px] font-bold text-primary truncate max-w-xs">
+                {senderName}
+              </span>
+            </div>
+          )}
+
+          {/* Attachments rendering */}
+          {message.attachments && message.attachments.length > 0 && (
+            <div className="space-y-1">
+              {message.attachments.map((att, idx) => renderAttachment(att, idx))}
           {/* Action Menu Button (Visible on Hover for undeleted messages) */}
           {!isDeleted && onDeleteMessage && (
             <div

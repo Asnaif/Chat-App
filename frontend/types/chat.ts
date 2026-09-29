@@ -46,3 +46,21 @@ export interface IChat {
   updatedAt: string;
   unreadCount?: number;
 }
+
+export interface IGroupMember {
+  userId: IUser;
+  role: 'admin' | 'member';
+  joinedAt: string | Date;
+}
+
+export interface IGroup {
+  _id: string;
+  chatId: string;
+  name: string;
+  description?: string;
+  avatarUrl?: string;
+  createdBy: IUser | string;
+  members: IGroupMember[];
+  createdAt: string;
+  updatedAt: string;
+}
