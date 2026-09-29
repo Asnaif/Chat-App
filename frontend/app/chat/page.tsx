@@ -264,6 +264,8 @@ export default function ChatDashboardPage() {
           )
         );
       }
+    };
+
     // Listen to incoming call
     const handleCallIncoming = ({
       callId,
@@ -567,33 +569,32 @@ export default function ChatDashboardPage() {
       </div>
 
       {/* 2. Conversations Sidebar or Contacts List */}
-      <div className={`${activeChat ? "hidden md:flex" : "flex"} flex-1 md:flex-initial h-full`}>
-        {activeTab === "contacts" ? (
-          <ContactsView
-            onlineUserIds={Array.from(onlineUserIds)}
-            onSelectChat={(chat) => {
-              setChats((prev) => {
-                if (prev.some((c) => c._id === chat._id)) return prev;
-                return [chat, ...prev];
-              });
-              setActiveChat(chat);
-            }}
-            onSwitchToChats={() => setActiveTab("chats")}
-          />
-        ) : (
-      {/* 2. Conversations Sidebar (Hidden on mobile if a chat is actively selected, or when in calls tab) */}
       {activeTab !== "calls" && (
         <div className={`${activeChat ? "hidden md:flex" : "flex"} flex-1 md:flex-initial h-full`}>
-          <ChatSidebar
-            currentUser={user}
-            chats={chats}
-            activeChat={activeChat}
-            onlineUserIds={onlineUserIds}
-            onSelectChat={(chat) => setActiveChat(chat)}
-            onOpenNewChat={() => setIsNewChatOpen(true)}
-            onOpenCreateGroup={() => setIsCreateGroupOpen(true)}
-            loading={loadingChats}
-          />
+          {activeTab === "contacts" ? (
+            <ContactsView
+              onlineUserIds={Array.from(onlineUserIds)}
+              onSelectChat={(chat) => {
+                setChats((prev) => {
+                  if (prev.some((c) => c._id === chat._id)) return prev;
+                  return [chat, ...prev];
+                });
+                setActiveChat(chat);
+              }}
+              onSwitchToChats={() => setActiveTab("chats")}
+            />
+          ) : (
+            <ChatSidebar
+              currentUser={user}
+              chats={chats}
+              activeChat={activeChat}
+              onlineUserIds={onlineUserIds}
+              onSelectChat={(chat) => setActiveChat(chat)}
+              onOpenNewChat={() => setIsNewChatOpen(true)}
+              onOpenCreateGroup={() => setIsCreateGroupOpen(true)}
+              loading={loadingChats}
+            />
+          )}
         </div>
       )}
 

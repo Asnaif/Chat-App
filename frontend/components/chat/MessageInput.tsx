@@ -335,7 +335,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             <input
               ref={inputRef}
               type="text"
-              placeholder={pendingFile ? "Add a caption..." : "Type a message..."}
+              placeholder={selectedFile ? "Add a caption..." : "Type a message..."}
               value={text}
               onChange={handleChange}
               onKeyDown={handleKeyDown}

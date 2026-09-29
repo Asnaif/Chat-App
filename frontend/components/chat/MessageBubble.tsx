@@ -28,7 +28,6 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   isSelf,
   isGroup = false,
   onUserClick,
-}) => {
   onDeleteMessage,
 }) => {
   const [showMenu, setShowMenu] = useState(false);
@@ -83,10 +82,6 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             </div>
           )}
 
-          {/* Attachments rendering */}
-          {message.attachments && message.attachments.length > 0 && (
-            <div className="space-y-1">
-              {message.attachments.map((att, idx) => renderAttachment(att, idx))}
           {/* Action Menu Button (Visible on Hover for undeleted messages) */}
           {!isDeleted && onDeleteMessage && (
             <div
