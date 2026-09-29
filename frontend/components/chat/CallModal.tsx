@@ -30,29 +30,35 @@ interface CallModalProps {
   onCallIdUpdate?: (callId: string) => void;
 }
 
+// Production TURN & STUN servers from Metered.ca (allows cross-network WebRTC connections)
+const DEFAULT_ICE_SERVERS: RTCIceServer[] = [
+  { urls: "stun:stun.l.google.com:19302" },
+  { urls: "stun:stun1.l.google.com:19302" },
+  { urls: "stun:stun.relay.metered.ca:80" },
+  {
+    urls: "turn:global.relay.metered.ca:80",
+    username: "7cab7783635cfc5fd9f3d2ad",
+    credential: "NsV1g0vkduIGc5Pn",
+  },
+  {
+    urls: "turn:global.relay.metered.ca:80?transport=tcp",
+    username: "7cab7783635cfc5fd9f3d2ad",
+    credential: "NsV1g0vkduIGc5Pn",
+  },
+  {
+    urls: "turn:global.relay.metered.ca:443",
+    username: "7cab7783635cfc5fd9f3d2ad",
+    credential: "NsV1g0vkduIGc5Pn",
+  },
+  {
+    urls: "turns:global.relay.metered.ca:443?transport=tcp",
+    username: "7cab7783635cfc5fd9f3d2ad",
+    credential: "NsV1g0vkduIGc5Pn",
+  },
+];
+
 const ICE_SERVERS: RTCConfiguration = {
-  iceServers: [
-    { urls: "stun:stun.l.google.com:19302" },
-    { urls: "stun:stun1.l.google.com:19302" },
-    { urls: "stun:stun2.l.google.com:19302" },
-    { urls: "stun:stun3.l.google.com:19302" },
-    { urls: "stun:stun.services.mozilla.com" },
-    {
-      urls: "turn:openrelay.metered.ca:80",
-      username: "openrelayproject",
-      credential: "openrelayproject",
-    },
-    {
-      urls: "turn:openrelay.metered.ca:443",
-      username: "openrelayproject",
-      credential: "openrelayproject",
-    },
-    {
-      urls: "turn:openrelay.metered.ca:443?transport=tcp",
-      username: "openrelayproject",
-      credential: "openrelayproject",
-    },
-  ],
+  iceServers: DEFAULT_ICE_SERVERS,
   iceCandidatePoolSize: 10,
 };
 
