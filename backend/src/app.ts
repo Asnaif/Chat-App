@@ -55,11 +55,17 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Health Check Endpoint
 app.get('/health', (_req: Request, res: Response) => {
-  const { isDbConnected } = require('./config/db');
+  const { isDbConnected, getDbError, getDbUriType } = require('./config/db');
   sendSuccess({
     res,
     message: 'Chat App API Server is healthy',
-    data: { status: 'UP', dbConnected: isDbConnected(), timestamp: new Date().toISOString() },
+    data: {
+      status: 'UP',
+      dbConnected: isDbConnected(),
+      dbUriType: getDbUriType(),
+      dbError: getDbError(),
+      timestamp: new Date().toISOString(),
+    },
   });
 });
 
