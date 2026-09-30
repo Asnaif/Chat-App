@@ -9,13 +9,25 @@ try {
   // Ignore in environments where setting servers is restricted
 }
 
-export const connectDB = async (): Promise<void> => {
+let isConnected = false;
 
+export const isDbConnected = (): boolean => isConnected;
+
+export const connectDB = async (retryCount = 0): Promise<void> => {
   try {
-    const conn = await mongoose.connect(ENV.MONGODB_URI);
+    const conn = await mongoose.connect(ENV.MONGODB_URI, {
+      serverSelectionTimeoutMS: 10000,
+    });
+    isConnected = true;
     console.log(`[MongoDB Connected]: ${conn.connection.host}`);
   } catch (error) {
-    console.error('[MongoDB Connection Error]:', error);
-    process.exit(1);
+    isConnected = false;
+    console.error(`[MongoDB Connection Error] (attempt ${retryCount + 1}):`, error);
+    // Retry connection after 5 seconds instead of crashing the process
+    if (retryCount < 10) {
+      console.log('[MongoDB] Retrying connection in 5 seconds...');
+      setTimeout(() => connectDB(retryCount + 1), 5000);
+    }
   }
 };
+
