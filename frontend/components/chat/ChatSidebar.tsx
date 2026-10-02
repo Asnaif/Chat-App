@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Search, Plus, MessageSquare, CheckCheck, Users } from "lucide-react";
+import { Search, Plus, MessageSquare, Check, CheckCheck, Users } from "lucide-react";
 import { IChat, IUser } from "@/types/chat";
 import { User } from "@/context/AuthContext";
 import { format, isToday, isYesterday } from "date-fns";
@@ -245,9 +245,19 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
 
                   <div className="flex items-center justify-between">
                     <p className="text-xs text-text-secondary truncate max-w-[170px] flex items-center gap-1">
-                      {senderObj && senderObj._id === currentUser?._id && (
-                        <CheckCheck className="w-3.5 h-3.5 text-primary shrink-0" />
-                      )}
+                      {senderObj && senderObj._id === currentUser?._id && (() => {
+                        const msgReadBy = lastMsg?.readBy?.length || 0;
+                        const msgDeliveredTo = lastMsg?.deliveredTo?.length || 0;
+                        const isRead = msgReadBy > 1;
+                        const isDelivered = msgDeliveredTo > 1;
+                        if (isRead) {
+                          return <CheckCheck className="w-3.5 h-3.5 text-primary shrink-0" />;
+                        } else if (isDelivered) {
+                          return <CheckCheck className="w-3.5 h-3.5 text-text-muted shrink-0" />;
+                        } else {
+                          return <Check className="w-3.5 h-3.5 text-text-muted shrink-0" />;
+                        }
+                      })()}
                       <span>{lastMsg?.text || "No messages yet"}</span>
                     </p>
 

@@ -286,23 +286,12 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           </button>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Hidden File Inputs */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            onChange={handleFileSelect}
-            className="hidden"
-            accept="*/*"
-          />
+        {/* Input Field Container */}
+        <div className="flex-1 relative flex items-center bg-[#232A3B] border border-[#2F374A] rounded-2xl px-4 py-2 focus-within:border-primary transition-all">
           <input
             ref={inputRef}
             type="text"
-            placeholder={
-              selectedFile
-                ? "Add a caption..."
-                : "Type a message..."
-            }
+            placeholder={selectedFile ? "Add a caption..." : "Type a message..."}
             value={text}
             onChange={handleChange}
             onKeyDown={handleKeyDown}
@@ -310,68 +299,16 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             className="w-full bg-transparent text-white text-sm placeholder:text-text-muted focus:outline-none"
           />
 
-          {/* Attachment Options */}
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="w-10 h-10 rounded-xl flex items-center justify-center text-text-muted hover:text-white hover:bg-[#232A3B] transition-colors"
-              title="Attach document/file"
-            >
-              <Paperclip className="w-5 h-5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => imageInputRef.current?.click()}
-              className="hidden sm:flex w-10 h-10 rounded-xl items-center justify-center text-text-muted hover:text-white hover:bg-[#232A3B] transition-colors"
-              title="Attach photo/video"
-            >
-              <ImageIcon className="w-5 h-5" />
-            </button>
-          </div>
-
-          {/* Input Field Container */}
-          <div className="flex-1 relative flex items-center bg-[#232A3B] border border-[#2F374A] rounded-2xl px-4 py-2 focus-within:border-primary transition-all">
-            <input
-              ref={inputRef}
-              type="text"
-              placeholder={selectedFile ? "Add a caption..." : "Type a message..."}
-              value={text}
-              onChange={handleChange}
-              onKeyDown={handleKeyDown}
-              disabled={disabled || isUploading}
-              className="w-full bg-transparent text-white text-sm placeholder:text-text-muted focus:outline-none"
-            />
-
-            <button
-              type="button"
-              onClick={() => {
-                const emojis = ["😊", "👍", "❤️", "🔥", "🎉", "👏", "🙏"];
-                const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
-                setText((prev) => prev + randomEmoji);
-              }}
-              className="text-text-muted hover:text-white p-1 rounded-lg transition-colors ml-2"
-              title="Quick emoji"
-            >
-              <Smile className="w-5 h-5" />
-            </button>
-          </div>
-
-          {/* Send Button */}
           <button
             type="button"
             onClick={() => setShowEmojiPicker((prev) => !prev)}
             disabled={disabled || isUploading}
-            className={`p-1 rounded-lg transition-colors ml-2 ${
+            className={`p-1 rounded-lg transition-colors ml-2 shrink-0 ${
               showEmojiPicker ? "text-primary" : "text-text-muted hover:text-white"
             }`}
             title="Insert emoji"
           >
-            {isUploading ? (
-              <Loader2 className="w-5 h-5 animate-spin text-white" />
-            ) : (
-              <Send className="w-5 h-5" />
-            )}
+            <Smile className="w-5 h-5" />
           </button>
         </div>
 
@@ -380,7 +317,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           type="button"
           onClick={handleSend}
           disabled={(!text.trim() && !selectedFile) || disabled || isUploading}
-          className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all ${
+          className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all shrink-0 ${
             (text.trim() || selectedFile) && !disabled && !isUploading
               ? "bg-primary hover:bg-primary-hover text-white shadow-glow active:scale-95 cursor-pointer"
               : "bg-[#232A3B] text-text-muted cursor-not-allowed border border-[#2F374A]"
