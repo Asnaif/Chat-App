@@ -10,7 +10,7 @@ export const getSocket = (): Socket => {
       auth: {
         token: token,
       },
-      transports: ['polling', 'websocket'],
+      transports: ['websocket', 'polling'],
       autoConnect: true,
       reconnection: true,
       reconnectionAttempts: 20,

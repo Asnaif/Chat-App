@@ -298,6 +298,7 @@ export default function ChatDashboardPage() {
       toast(`👥 You were added to group "${newGroup?.name || 'Group'}"!`, { icon: "🎉" });
     };
 
+    socket.on("connect", fetchChats);
     socket.on("message:created", handleNewMessage);
     socket.on("chat:updated", handleChatUpdated);
     socket.on("presence:update", handlePresenceUpdate);
@@ -310,6 +311,7 @@ export default function ChatDashboardPage() {
     socket.on("group:created", handleGroupCreatedEvent);
 
     return () => {
+      socket.off("connect", fetchChats);
       socket.off("message:created", handleNewMessage);
       socket.off("chat:updated", handleChatUpdated);
       socket.off("presence:update", handlePresenceUpdate);
